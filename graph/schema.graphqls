@@ -1,0 +1,135 @@
+type Query {
+  video(id: ID!): Video!
+
+  videos(paginate: Paginate, title: String, contributor: ContributorFilter): [Video!]!
+
+  series(paginate: Paginate): [Series!]!
+
+  episodes(series: SeriesFilter): [Episode!]!
+}
+
+
+
+type Mutation {
+  # transitional until backend scraper
+  setTomatometer(id: ID!, tomatometer: Int!): Video!
+}
+
+
+
+type Video {
+  id: ID!
+  title: String!		# in popular US english leaning, no cut, no year
+  sortTitle: String		# trim articles and enumerate series
+  releaseYear: Int!		# in Gregorian calendar, theatrical
+  renditions(quality: QualityFilter): [Rendition!] # null => coming soon
+  artwork(geometry: GeometryFilter): Jpeg # base64 downsample
+  description: String
+  directors: [Contributor!]
+  writers: [Contributor!]
+  cast: [Contributor!]	        # TODO other contributors, i.e. composer
+  genre: String
+  rating: String
+  tomatometer: Int		# TODO use side-table, of stubs?
+  episode: Episode
+}
+
+
+
+type Rendition {
+  id: ID!
+  video: Video!
+  url: String!
+  cut: String			# null => theatrical
+  quality: Quality!
+  duration: Int			# in minutes
+  isHD: Boolean			# quality.resolution == 1080P
+  size: Int!			# in bytes
+}
+
+
+
+type Episode {			# i.e. TV Show
+  series: Series!
+  season: Int!
+  episode: Int!
+  video: Video!
+}
+
+input EpisodeFilter {
+  series: SeriesFilter
+  season: Int
+  episode: Int
+}
+
+
+
+type Series {
+  id: ID!
+  name: String!
+  artwork(geometry: GeometryFilter): Jpeg # base64 downsample
+  episodes: [Episode!]!
+}
+
+input SeriesFilter {
+  id: ID
+  name: String
+}
+
+
+
+type Contributor {
+  id: ID!
+  name: String!
+}
+
+input ContributorFilter {
+  name: String
+}
+
+
+
+type Quality {
+  videoCodec: VideoCodec!
+  resolution: Resolution!
+  transcodeBudget: TranscodeBudget
+}
+
+input QualityFilter {
+  videoCodec: VideoCodec	# often a compatibility concern
+  resolution: Resolution
+}
+
+enum VideoCodec {
+  H265
+  H264
+}
+
+enum Resolution {
+  _1080P
+  _720P
+  _480P
+}
+
+enum TranscodeBudget {
+  SUPER_HQ
+  HQ
+  FAST
+  VERY_FAST
+}
+
+
+
+input GeometryFilter {
+  width: Int
+  height: Int
+}
+
+scalar Jpeg
+
+
+
+input Paginate {
+  first: Int
+  after: ID
+}

@@ -1,0 +1,21 @@
+{
+  videos(paginate: {first: 2, after: "a1gI6DMLB6YHoqGU88mwzWS9jUtt0vROuV5daC9Luxs="}) {
+    id
+    title
+    releaseYear
+    description
+    directors { name }
+    genre
+    renditions {
+      url
+    }
+    episode {
+      series {
+        name
+      }
+      season
+      episode
+    }
+ 	  artwork(geometry: {height: 36})
+  }
+}
