@@ -116,6 +116,8 @@ func (r *queryResolver) Episodes(ctx context.Context, series *model.SeriesFilter
 		matches = append(matches, video.Episode)
 	}
 
+	// XXX sort by Series.Name then Series.Season then Series.Episode
+
 	return matches, nil
 }
 

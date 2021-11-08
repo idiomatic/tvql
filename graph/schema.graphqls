@@ -1,52 +1,149 @@
+"Queries."
 type Query {
-
+  "Get a specific video."
   video(id: ID!): Video!
 
+  """
+  Get a slice of videos.
+  Filter by title and/or contributor (if specified).
+  Ordered by sort title (or cleaned title).
+  """
   videos(paginate: Paginate, title: String, contributor: ContributorFilter): [Video!]!
 
+  "Get a slice of TV series, ordered by sort name (or cleaned name)."
   series(paginate: Paginate): [Series!]!
 
+  """
+  Get a list of episodes.
+  Filter by series details (if specified).
+  """
   episodes(series: SeriesFilter): [Episode!]!
-
 }
 
 
+"Mutations."
 type Mutation {
   # transitional until backend scraper and storage
   setTomatometer(id: ID!, tomatometer: Int!): Video!
 }
 
 
+"Video details."
 type Video {
+  """
+  Video identity.
+  Currently a hash of title + releaseYear.
+  """
   id: ID!
-  title: String!		# in en-US, omit (cut), omit (year)
-  sortTitle: String		# trim articles (e.g. "The"), explicitly enumerate series, optionally trim subtitle
-  releaseYear: Int!		# in Gregorian calendar, of theatrical release
-  renditions(quality: QualityFilter): [Rendition!] # null => coming soon
-  artwork(geometry: GeometryFilter): Jpeg # downsample
+
+  """
+  Title, in en-US, without cut or year parenthetical qualifiers.
+  Currently derived from the mp4 moov.udta.meta.ilst.©nam.data atom.
+  """
+  title: String!
+
+  """
+  Sortable title (optional).
+  Omits leading articles such as "The", "A", or "An".
+  Destyleized and normalized (i.e., "Se7en" => "Seven").
+  Normalized to first in the series (i.e., "Fast & Furious 2").
+  Includes explicit episode arabic-number for sequels (as roman numerals are not readily sortable).
+  Currently derived from the mp4 moov.udta.meta.ilst.sonm.data atom.
+  """
+  sortTitle: String
+
+  """
+  Year of initial/theatrical release.
+  Per Gregorian calendar.
+  Required due to remake ambiguity.
+  Currently derived from the mp4 moov.udta.meta.ilst.©day.data atom.
+  """
+  releaseYear: Int!
+
+  """
+  List of various renditions of this video.
+  Filter by rendition quality (if specified).
+  Null or empty list implies this video is a placeholder, and renditions are coming soon.
+  """
+  renditions(quality: QualityFilter): [Rendition!]
+
+  """
+  Cover art image (optional).
+  Base64 encoded JPEG.
+  Downsampled per geometry (if specified).
+  Currently derived from the mp4 moov.udta.meta.ilst.covr.data atom.
+  """
+  artwork(geometry: GeometryFilter): Jpeg
+
+  """
+  Description paragraph (optional).
+  Currently derived from the mp4 moov.udta.meta.ilst.desc.data atom.
+  """
   description: String
+
+  "NYI"
   directors: [Contributor!]
+
+  "NYI"
   writers: [Contributor!]
+
+  "NYI"
   cast: [Contributor!]	        # TODO add other kinds of contributors
+
+  """
+  Primary genre (optional).
+  Currently derived from the mp4 moov.udta.meta.ilst.©gen.data atom.
+  """
   genre: String
+
+  "Content advisory rating (optional)."
   rating: String
+
+  "Rotten Tomatoes reviewer score (optional)."
   tomatometer: Int
+
+  "Episodic details (optional)."
   episode: Episode
 }
 
 
+"Video rendition details."
 type Rendition {
+  """
+  Rendition identity.
+  Currently a hash of local path.
+  """
   id: ID!
+
+  "Video rendition download URL."
   url: String!
-  cut: String			# null => theatrical
+
+  """
+  Cut (optional).
+  Omit wrapping parenthesis.
+  If absent, "theatrical" is implied.
+  """
+  cut: String
+
+  "Quality details."
   quality: Quality!
-  duration: Int			# in minutes
-  isHD: Boolean			# approximately quality.resolution == 1080P
-  size: Int!			# in bytes
+
+  "Length of video, in minutes."
+  duration: Int
+
+  """
+  Is video high definition, i.e., 1080p resolution?
+  Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
+  """
+  isHD: Boolean
+
+  "Size of the video, in bytes."
+  size: Int!
 }
 
 
-type Episode {			# i.e. TV Show
+"Episode (i.e., TV Show) details."
+type Episode {
   series: Series!
   season: Int!
   episode: Int!
@@ -60,11 +157,34 @@ input EpisodeFilter {
 }
 
 
+"Series details."
 type Series {
+  "Series identity."
   id: ID!
+
+  """
+  Series name.
+  May include reboot qualifiers (e.g., "The Twilight Zone (2019)").
+  Currently derived from the mp4 moov.udta.meta.ilst.tvsh.data atom.
+  """
   name: String!
+
+  """
+  Sortable name (optional).
+  Omits leading articles such as "The", "A", or "An".
+  Currently derived from the mp4 moov.udta.meta.ilst.sosn.data atom.
+  """
   sortName: String
-  artwork(geometry: GeometryFilter): Jpeg # downsample
+
+  """
+  Series image (optional).
+  NYI.
+  Base64 encoded JPEG.
+  Downsampled per geometry (if specified).
+  """
+  artwork(geometry: GeometryFilter): Jpeg
+
+  "List of episodes."
   episodes: [Episode!]!
 }
 
@@ -80,29 +200,38 @@ type Contributor {
 }
 
 input ContributorFilter {
+  id: ID		       # will need contributor interning index
   name: String
 }
 
 
 type Quality {
   videoCodec: VideoCodec!
-
   resolution: Resolution!
   transcodeBudget: TranscodeBudget
 }
 
 input QualityFilter {
-  videoCodec: VideoCodec	# for client compatibility concerns
+  videoCodec: VideoCodec
   resolution: Resolution
 }
 
 enum VideoCodec {
+  "h.265"
   h265
+
+  "h.264 (min-spec, default)"
   h264
 }
 
+"""
+Label to describe resolution.
+Examples: 480p, 720p, 1080p.
+[Not an enum because of leading-digit values.]
+"""
 scalar Resolution
 
+"Amount of time and bitrate afforded to HandBrake transcode."
 enum TranscodeBudget {
   Super_HQ
   HQ
@@ -120,7 +249,17 @@ input GeometryFilter {
 scalar Jpeg			# base64
 
 
+"Slice of identifiable objects."
 input Paginate {
+  """
+  Maximum length of list returned (optional).
+  If omitted, return remaining objects.
+  """
   first: Int
+
+  """
+  Return objects after this identified one.
+  Requires a stable list.
+  """
   after: ID
 }

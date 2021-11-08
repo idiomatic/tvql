@@ -22,6 +22,7 @@ type File struct {
 	nam  *mp4.Data
 	tvnn *mp4.Data
 	tvsh *mp4.Data
+	sosn *mp4.Data
 	tvsn *mp4.Data
 	tves *mp4.Data
 	tven *mp4.Data
@@ -238,7 +239,7 @@ func (f *File) MediaKind() (string, error) {
 	return "", fmt.Errorf("unknown stik %d\n", f.stik.Data[0])
 }
 
-func (f *File) TVShow() (string, error) {
+func (f *File) TVShowName() (string, error) {
 	if err := f.survey(); err != nil {
 		return "", err
 	}
@@ -248,6 +249,18 @@ func (f *File) TVShow() (string, error) {
 	}
 
 	return string(f.tvsh.Data), nil
+}
+
+func (f *File) TVSortShowName() (string, error) {
+	if err := f.survey(); err != nil {
+		return "", err
+	}
+
+	if f.sosn == nil {
+		return "", errors.New("sosn atom missing")
+	}
+
+	return string(f.sosn.Data), nil
 }
 
 func (f *File) TVSeason() (int, error) {

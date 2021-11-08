@@ -159,12 +159,21 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				}
 
 				// XXX switch off mediakind?
-				if tvshow, err := videoFile.TVShow(); err == nil && tvshow != "" {
+				if tvshow, err := videoFile.TVShowName(); err == nil && tvshow != "" {
 					seriesID := hashToStr(tvshow)
+					sortShowName, _ := videoFile.TVSortShowName()
+
 					r.mutex.Lock()
 					series, ok := r.series[seriesID]
 					if !ok {
-						series = &model.Series{ID: seriesID, Name: tvshow}
+						series = &model.Series{
+							ID:   seriesID,
+							Name: tvshow,
+						}
+						if sortShowName != "" {
+							series.SortName = &sortShowName
+						}
+
 						r.series[seriesID] = series
 					}
 					r.mutex.Unlock()

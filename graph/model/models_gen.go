@@ -14,9 +14,11 @@ type Contributor struct {
 }
 
 type ContributorFilter struct {
+	ID   *string `json:"id"`
 	Name *string `json:"name"`
 }
 
+// Episode (i.e., TV Show) details.
 type Episode struct {
 	Series  *Series `json:"series"`
 	Season  int     `json:"season"`
@@ -35,8 +37,13 @@ type GeometryFilter struct {
 	Height *int `json:"height"`
 }
 
+// Slice of identifiable objects.
 type Paginate struct {
-	First *int    `json:"first"`
+	// Maximum length of list returned (optional).
+	// If omitted, return remaining objects.
+	First *int `json:"first"`
+	// Return objects after this identified one.
+	// Requires a stable list.
 	After *string `json:"after"`
 }
 
@@ -51,21 +58,46 @@ type QualityFilter struct {
 	Resolution *string     `json:"resolution"`
 }
 
+// Video rendition details.
 type Rendition struct {
-	ID       string   `json:"id"`
-	URL      string   `json:"url"`
-	Cut      *string  `json:"cut"`
-	Quality  *Quality `json:"quality"`
-	Duration *int     `json:"duration"`
-	IsHd     *bool    `json:"isHD"`
-	Size     int      `json:"size"`
+	// Rendition identity.
+	// Currently a hash of local path.
+	ID string `json:"id"`
+	// Video rendition download URL.
+	URL string `json:"url"`
+	// Cut (optional).
+	// Omit wrapping parenthesis.
+	// If absent, "theatrical" is implied.
+	Cut *string `json:"cut"`
+	// Quality details.
+	Quality *Quality `json:"quality"`
+	// Length of video, in minutes.
+	Duration *int `json:"duration"`
+	// Is video high definition, i.e., 1080p resolution?
+	// Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
+	IsHd *bool `json:"isHD"`
+	// Size of the video, in bytes.
+	Size int `json:"size"`
 }
 
+// Series details.
 type Series struct {
-	ID       string     `json:"id"`
-	Name     string     `json:"name"`
-	SortName *string    `json:"sortName"`
-	Artwork  *string    `json:"artwork"`
+	// Series identity.
+	ID string `json:"id"`
+	// Series name.
+	// May include reboot qualifiers (e.g., "The Twilight Zone (2019)").
+	// Currently derived from the mp4 moov.udta.meta.ilst.tvsh.data atom.
+	Name string `json:"name"`
+	// Sortable name (optional).
+	// Omits leading articles such as "The", "A", or "An".
+	// Currently derived from the mp4 moov.udta.meta.ilst.sosn.data atom.
+	SortName *string `json:"sortName"`
+	// Series image (optional).
+	// NYI.
+	// Base64 encoded JPEG.
+	// Downsampled per geometry (if specified).
+	Artwork *string `json:"artwork"`
+	// List of episodes.
 	Episodes []*Episode `json:"episodes"`
 }
 
@@ -74,23 +106,56 @@ type SeriesFilter struct {
 	Name *string `json:"name"`
 }
 
+// Video details.
 type Video struct {
-	ID          string         `json:"id"`
-	Title       string         `json:"title"`
-	SortTitle   *string        `json:"sortTitle"`
-	ReleaseYear int            `json:"releaseYear"`
-	Renditions  []*Rendition   `json:"renditions"`
-	Artwork     *string        `json:"artwork"`
-	Description *string        `json:"description"`
-	Directors   []*Contributor `json:"directors"`
-	Writers     []*Contributor `json:"writers"`
-	Cast        []*Contributor `json:"cast"`
-	Genre       *string        `json:"genre"`
-	Rating      *string        `json:"rating"`
-	Tomatometer *int           `json:"tomatometer"`
-	Episode     *Episode       `json:"episode"`
+	// Video identity.
+	// Currently a hash of title + releaseYear.
+	ID string `json:"id"`
+	// Title, in en-US, without cut or year parenthetical qualifiers.
+	// Currently derived from the mp4 moov.udta.meta.ilst.©nam.data atom.
+	Title string `json:"title"`
+	// Sortable title (optional).
+	// Omits leading articles such as "The", "A", or "An".
+	// Destyleized and normalized (i.e., "Se7en" => "Seven").
+	// Normalized to first in the series (i.e., "Fast & Furious 2").
+	// Includes explicit episode arabic-number for sequels (as roman numerals are not readily sortable).
+	// Currently derived from the mp4 moov.udta.meta.ilst.sonm.data atom.
+	SortTitle *string `json:"sortTitle"`
+	// Year of initial/theatrical release.
+	// Per Gregorian calendar.
+	// Required due to remake ambiguity.
+	// Currently derived from the mp4 moov.udta.meta.ilst.©day.data atom.
+	ReleaseYear int `json:"releaseYear"`
+	// List of various renditions of this video.
+	// Filter by rendition quality (if specified).
+	// Null or empty list implies this video is a placeholder, and renditions are coming soon.
+	Renditions []*Rendition `json:"renditions"`
+	// Cover art image (optional).
+	// Base64 encoded JPEG.
+	// Downsampled per geometry (if specified).
+	// Currently derived from the mp4 moov.udta.meta.ilst.covr.data atom.
+	Artwork *string `json:"artwork"`
+	// Description paragraph (optional).
+	// Currently derived from the mp4 moov.udta.meta.ilst.desc.data atom.
+	Description *string `json:"description"`
+	// NYI
+	Directors []*Contributor `json:"directors"`
+	// NYI
+	Writers []*Contributor `json:"writers"`
+	// NYI
+	Cast []*Contributor `json:"cast"`
+	// Primary genre (optional).
+	// Currently derived from the mp4 moov.udta.meta.ilst.©gen.data atom.
+	Genre *string `json:"genre"`
+	// Content advisory rating (optional).
+	Rating *string `json:"rating"`
+	// Rotten Tomatoes reviewer score (optional).
+	Tomatometer *int `json:"tomatometer"`
+	// Episodic details (optional).
+	Episode *Episode `json:"episode"`
 }
 
+// Amount of time and bitrate afforded to HandBrake transcode.
 type TranscodeBudget string
 
 const (
@@ -139,7 +204,9 @@ func (e TranscodeBudget) MarshalGQL(w io.Writer) {
 type VideoCodec string
 
 const (
+	// h.265
 	VideoCodecH265 VideoCodec = "h265"
+	// h.264 (min-spec, default)
 	VideoCodecH264 VideoCodec = "h264"
 )
 
