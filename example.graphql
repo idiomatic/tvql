@@ -16,6 +16,6 @@
       season
       episode
     }
- 	  artwork(geometry: {height: 36})
+    artwork(geometry: {height: 36})
   }
 }
