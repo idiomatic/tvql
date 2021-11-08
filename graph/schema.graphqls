@@ -1,4 +1,5 @@
 type Query {
+
   video(id: ID!): Video!
 
   videos(paginate: Paginate, title: String, contributor: ContributorFilter): [Video!]!
@@ -6,47 +7,43 @@ type Query {
   series(paginate: Paginate): [Series!]!
 
   episodes(series: SeriesFilter): [Episode!]!
+
 }
 
 
-
 type Mutation {
-  # transitional until backend scraper
+  # transitional until backend scraper and storage
   setTomatometer(id: ID!, tomatometer: Int!): Video!
 }
 
 
-
 type Video {
   id: ID!
-  title: String!		# in popular US english leaning, no cut, no year
-  sortTitle: String		# trim articles and enumerate series
-  releaseYear: Int!		# in Gregorian calendar, theatrical
+  title: String!		# in en-US, omit (cut), omit (year)
+  sortTitle: String		# trim articles (e.g. "The"), explicitly enumerate series, optionally trim subtitle
+  releaseYear: Int!		# in Gregorian calendar, of theatrical release
   renditions(quality: QualityFilter): [Rendition!] # null => coming soon
-  artwork(geometry: GeometryFilter): Jpeg # base64 downsample
+  artwork(geometry: GeometryFilter): Jpeg # downsample
   description: String
   directors: [Contributor!]
   writers: [Contributor!]
-  cast: [Contributor!]	        # TODO other contributors, i.e. composer
+  cast: [Contributor!]	        # TODO add other kinds of contributors
   genre: String
   rating: String
-  tomatometer: Int		# TODO use side-table, of stubs?
+  tomatometer: Int
   episode: Episode
 }
 
 
-
 type Rendition {
   id: ID!
-  video: Video!
   url: String!
   cut: String			# null => theatrical
   quality: Quality!
   duration: Int			# in minutes
-  isHD: Boolean			# quality.resolution == 1080P
+  isHD: Boolean			# approximately quality.resolution == 1080P
   size: Int!			# in bytes
 }
-
 
 
 type Episode {			# i.e. TV Show
@@ -63,11 +60,11 @@ input EpisodeFilter {
 }
 
 
-
 type Series {
   id: ID!
   name: String!
-  artwork(geometry: GeometryFilter): Jpeg # base64 downsample
+  sortName: String
+  artwork(geometry: GeometryFilter): Jpeg # downsample
   episodes: [Episode!]!
 }
 
@@ -75,7 +72,6 @@ input SeriesFilter {
   id: ID
   name: String
 }
-
 
 
 type Contributor {
@@ -88,7 +84,6 @@ input ContributorFilter {
 }
 
 
-
 type Quality {
   videoCodec: VideoCodec!
   resolution: Resolution!
@@ -96,7 +91,7 @@ type Quality {
 }
 
 input QualityFilter {
-  videoCodec: VideoCodec	# often a compatibility concern
+  videoCodec: VideoCodec	# for client compatibility concerns
   resolution: Resolution
 }
 
@@ -119,14 +114,12 @@ enum TranscodeBudget {
 }
 
 
-
 input GeometryFilter {
   width: Int
   height: Int
 }
 
-scalar Jpeg
-
+scalar Jpeg			# base64
 
 
 input Paginate {

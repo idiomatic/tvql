@@ -53,7 +53,6 @@ type QualityFilter struct {
 
 type Rendition struct {
 	ID       string   `json:"id"`
-	Video    *Video   `json:"video"`
 	URL      string   `json:"url"`
 	Cut      *string  `json:"cut"`
 	Quality  *Quality `json:"quality"`
@@ -65,6 +64,7 @@ type Rendition struct {
 type Series struct {
 	ID       string     `json:"id"`
 	Name     string     `json:"name"`
+	SortName *string    `json:"sortName"`
 	Artwork  *string    `json:"artwork"`
 	Episodes []*Episode `json:"episodes"`
 }

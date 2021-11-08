@@ -34,16 +34,16 @@ func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, ti
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if title != nil {
-		panic(fmt.Errorf("not implemented"))
-	}
-
 	if contributor != nil {
 		panic(fmt.Errorf("not implemented"))
 	}
 
 	skipping := (paginate != nil && paginate.After != nil)
 	for _, video := range r.videos {
+		if title != nil && video.Title != *title {
+			continue
+		}
+
 		if !skipping {
 			matches = append(matches, video)
 		}

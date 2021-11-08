@@ -81,7 +81,6 @@ type ComplexityRoot struct {
 		Quality  func(childComplexity int) int
 		Size     func(childComplexity int) int
 		URL      func(childComplexity int) int
-		Video    func(childComplexity int) int
 	}
 
 	Series struct {
@@ -89,6 +88,7 @@ type ComplexityRoot struct {
 		Episodes func(childComplexity int) int
 		ID       func(childComplexity int) int
 		Name     func(childComplexity int) int
+		SortName func(childComplexity int) int
 	}
 
 	Video struct {
@@ -309,13 +309,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Rendition.URL(childComplexity), true
 
-	case "Rendition.video":
-		if e.complexity.Rendition.Video == nil {
-			break
-		}
-
-		return e.complexity.Rendition.Video(childComplexity), true
-
 	case "Series.artwork":
 		if e.complexity.Series.Artwork == nil {
 			break
@@ -348,6 +341,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Series.Name(childComplexity), true
+
+	case "Series.sortName":
+		if e.complexity.Series.SortName == nil {
+			break
+		}
+
+		return e.complexity.Series.SortName(childComplexity), true
 
 	case "Video.artwork":
 		if e.complexity.Video.Artwork == nil {
@@ -522,6 +522,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 
 var sources = []*ast.Source{
 	{Name: "graph/schema.graphqls", Input: `type Query {
+
   video(id: ID!): Video!
 
   videos(paginate: Paginate, title: String, contributor: ContributorFilter): [Video!]!
@@ -529,47 +530,43 @@ var sources = []*ast.Source{
   series(paginate: Paginate): [Series!]!
 
   episodes(series: SeriesFilter): [Episode!]!
+
 }
 
 
-
 type Mutation {
-  # transitional until backend scraper
+  # transitional until backend scraper and storage
   setTomatometer(id: ID!, tomatometer: Int!): Video!
 }
 
 
-
 type Video {
   id: ID!
-  title: String!		# in popular US english leaning, no cut, no year
-  sortTitle: String		# trim articles and enumerate series
-  releaseYear: Int!		# in Gregorian calendar, theatrical
+  title: String!		# in en-US, omit (cut), omit (year)
+  sortTitle: String		# trim articles (e.g. "The"), explicitly enumerate series, optionally trim subtitle
+  releaseYear: Int!		# in Gregorian calendar, of theatrical release
   renditions(quality: QualityFilter): [Rendition!] # null => coming soon
-  artwork(geometry: GeometryFilter): Jpeg # base64 downsample
+  artwork(geometry: GeometryFilter): Jpeg # downsample
   description: String
   directors: [Contributor!]
   writers: [Contributor!]
-  cast: [Contributor!]	        # TODO other contributors, i.e. composer
+  cast: [Contributor!]	        # TODO add other kinds of contributors
   genre: String
   rating: String
-  tomatometer: Int		# TODO use side-table, of stubs?
+  tomatometer: Int
   episode: Episode
 }
 
 
-
 type Rendition {
   id: ID!
-  video: Video!
   url: String!
   cut: String			# null => theatrical
   quality: Quality!
   duration: Int			# in minutes
-  isHD: Boolean			# quality.resolution == 1080P
+  isHD: Boolean			# approximately quality.resolution == 1080P
   size: Int!			# in bytes
 }
-
 
 
 type Episode {			# i.e. TV Show
@@ -586,11 +583,11 @@ input EpisodeFilter {
 }
 
 
-
 type Series {
   id: ID!
   name: String!
-  artwork(geometry: GeometryFilter): Jpeg # base64 downsample
+  sortName: String
+  artwork(geometry: GeometryFilter): Jpeg # downsample
   episodes: [Episode!]!
 }
 
@@ -598,7 +595,6 @@ input SeriesFilter {
   id: ID
   name: String
 }
-
 
 
 type Contributor {
@@ -611,7 +607,6 @@ input ContributorFilter {
 }
 
 
-
 type Quality {
   videoCodec: VideoCodec!
   resolution: Resolution!
@@ -619,7 +614,7 @@ type Quality {
 }
 
 input QualityFilter {
-  videoCodec: VideoCodec	# often a compatibility concern
+  videoCodec: VideoCodec	# for client compatibility concerns
   resolution: Resolution
 }
 
@@ -642,14 +637,12 @@ enum TranscodeBudget {
 }
 
 
-
 input GeometryFilter {
   width: Int
   height: Int
 }
 
-scalar Jpeg
-
+scalar Jpeg			# base64
 
 
 input Paginate {
@@ -1492,41 +1485,6 @@ func (ec *executionContext) _Rendition_id(ctx context.Context, field graphql.Col
 	return ec.marshalNID2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Rendition_video(ctx context.Context, field graphql.CollectedField, obj *model.Rendition) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Rendition",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Video, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*model.Video)
-	fc.Result = res
-	return ec.marshalNVideo2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐVideo(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _Rendition_url(ctx context.Context, field graphql.CollectedField, obj *model.Rendition) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1796,6 +1754,38 @@ func (ec *executionContext) _Series_name(ctx context.Context, field graphql.Coll
 	res := resTmp.(string)
 	fc.Result = res
 	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Series_sortName(ctx context.Context, field graphql.CollectedField, obj *model.Series) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Series",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SortName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Series_artwork(ctx context.Context, field graphql.CollectedField, obj *model.Series) (ret graphql.Marshaler) {
@@ -3900,11 +3890,6 @@ func (ec *executionContext) _Rendition(ctx context.Context, sel ast.SelectionSet
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "video":
-			out.Values[i] = ec._Rendition_video(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		case "url":
 			out.Values[i] = ec._Rendition_url(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -3958,6 +3943,8 @@ func (ec *executionContext) _Series(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "sortName":
+			out.Values[i] = ec._Series_sortName(ctx, field, obj)
 		case "artwork":
 			out.Values[i] = ec._Series_artwork(ctx, field, obj)
 		case "episodes":

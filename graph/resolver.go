@@ -137,14 +137,12 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 			resolvedURL := base.ResolveReference(relativeURL)
 
 			rendition := &model.Rendition{
-				ID:    hashToStr(path),
-				Video: video, // XXX reference loop
-				URL:   resolvedURL.String(),
-				Size:  int(info.Size()),
+				ID:   hashToStr(path),
+				URL:  resolvedURL.String(),
+				Size: int(info.Size()),
 			}
 
 			r.mutex.Lock()
-			// XXX reference loop
 			video.Renditions = append(video.Renditions, rendition)
 			r.mutex.Unlock()
 

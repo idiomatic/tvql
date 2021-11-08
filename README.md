@@ -1,16 +1,18 @@
 # tvql
 
-A GraphQL video library server (and first schema /flex).
+A GraphQL video library server (and first GraphQL schema /flex).
 
 See [schema](graph/schema.graphqls).
 
-* demonstrates query filters
-* demonstrates pagination cursors (`video(paginate: {first:3, after:$id}) ...`)
-* walks a filesystem tree
-* extracts iTunes mp4 metadata (`video { title description genre }`)
-* resizes extracted cover art on-the-fly (`artwork(geometry: {height: 360}) ...`)
-* coalesces similarly titled videos from different transcode profiles (or "renditions") (`video { renditions { url size }}`)
-* generates URL to served video HTTP resource
+This demonstrates:
+
+* query filters (_e.g._, `video(title: $title) ...`)
+* query pagination cursors (_e.g._, `video(paginate: {first:3, after:$id}) ...`)
+* iTunes "mp4" metadata extraction (_e.g._, `video { title description genre artwork }`)
+* on-the-fly cover art resizing (_e.g._, `video { artwork(geometry: {height: 360}) }`)
+* video rendition coalescing: combining similar videos from different transcode profiles (_e.g._, `video { renditions { url size }}`)
+* URL resource generation to embedded HTTP server (`http://localhost:$PORT/video/`)
+* filesystem tree traversal (`$ROOT`)
 
 
 ## miscellaneous mp4 specs
