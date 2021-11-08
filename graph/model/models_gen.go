@@ -42,13 +42,13 @@ type Paginate struct {
 
 type Quality struct {
 	VideoCodec      VideoCodec       `json:"videoCodec"`
-	Resolution      Resolution       `json:"resolution"`
+	Resolution      string           `json:"resolution"`
 	TranscodeBudget *TranscodeBudget `json:"transcodeBudget"`
 }
 
 type QualityFilter struct {
 	VideoCodec *VideoCodec `json:"videoCodec"`
-	Resolution *Resolution `json:"resolution"`
+	Resolution *string     `json:"resolution"`
 }
 
 type Rendition struct {
@@ -91,56 +91,13 @@ type Video struct {
 	Episode     *Episode       `json:"episode"`
 }
 
-type Resolution string
-
-const (
-	Resolution1080p Resolution = "_1080P"
-	Resolution720p  Resolution = "_720P"
-	Resolution480p  Resolution = "_480P"
-)
-
-var AllResolution = []Resolution{
-	Resolution1080p,
-	Resolution720p,
-	Resolution480p,
-}
-
-func (e Resolution) IsValid() bool {
-	switch e {
-	case Resolution1080p, Resolution720p, Resolution480p:
-		return true
-	}
-	return false
-}
-
-func (e Resolution) String() string {
-	return string(e)
-}
-
-func (e *Resolution) UnmarshalGQL(v interface{}) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = Resolution(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid Resolution", str)
-	}
-	return nil
-}
-
-func (e Resolution) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
-}
-
 type TranscodeBudget string
 
 const (
-	TranscodeBudgetSuperHq  TranscodeBudget = "SUPER_HQ"
+	TranscodeBudgetSuperHq  TranscodeBudget = "Super_HQ"
 	TranscodeBudgetHq       TranscodeBudget = "HQ"
-	TranscodeBudgetFast     TranscodeBudget = "FAST"
-	TranscodeBudgetVeryFast TranscodeBudget = "VERY_FAST"
+	TranscodeBudgetFast     TranscodeBudget = "Fast"
+	TranscodeBudgetVeryFast TranscodeBudget = "Very_Fast"
 )
 
 var AllTranscodeBudget = []TranscodeBudget{
@@ -182,8 +139,8 @@ func (e TranscodeBudget) MarshalGQL(w io.Writer) {
 type VideoCodec string
 
 const (
-	VideoCodecH265 VideoCodec = "H265"
-	VideoCodecH264 VideoCodec = "H264"
+	VideoCodecH265 VideoCodec = "h265"
+	VideoCodecH264 VideoCodec = "h264"
 )
 
 var AllVideoCodec = []VideoCodec{

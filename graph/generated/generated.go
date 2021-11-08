@@ -37,6 +37,7 @@ type Config struct {
 type ResolverRoot interface {
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Series() SeriesResolver
 	Video() VideoResolver
 }
 
@@ -118,7 +119,11 @@ type QueryResolver interface {
 	Series(ctx context.Context, paginate *model.Paginate) ([]*model.Series, error)
 	Episodes(ctx context.Context, series *model.SeriesFilter) ([]*model.Episode, error)
 }
+type SeriesResolver interface {
+	Episodes(ctx context.Context, obj *model.Series) ([]*model.Episode, error)
+}
 type VideoResolver interface {
+	Renditions(ctx context.Context, obj *model.Video, quality *model.QualityFilter) ([]*model.Rendition, error)
 	Artwork(ctx context.Context, obj *model.Video, geometry *model.GeometryFilter) (*string, error)
 }
 
@@ -609,6 +614,7 @@ input ContributorFilter {
 
 type Quality {
   videoCodec: VideoCodec!
+
   resolution: Resolution!
   transcodeBudget: TranscodeBudget
 }
@@ -619,21 +625,17 @@ input QualityFilter {
 }
 
 enum VideoCodec {
-  H265
-  H264
+  h265
+  h264
 }
 
-enum Resolution {
-  _1080P
-  _720P
-  _480P
-}
+scalar Resolution
 
 enum TranscodeBudget {
-  SUPER_HQ
+  Super_HQ
   HQ
-  FAST
-  VERY_FAST
+  Fast
+  Very_Fast
 }
 
 
@@ -641,6 +643,7 @@ input GeometryFilter {
   width: Int
   height: Int
 }
+
 
 scalar Jpeg			# base64
 
@@ -1174,9 +1177,9 @@ func (ec *executionContext) _Quality_resolution(ctx context.Context, field graph
 		}
 		return graphql.Null
 	}
-	res := resTmp.(model.Resolution)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalNResolution2githubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐResolution(ctx, field.Selections, res)
+	return ec.marshalNResolution2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Quality_transcodeBudget(ctx context.Context, field graphql.CollectedField, obj *model.Quality) (ret graphql.Marshaler) {
@@ -1838,14 +1841,14 @@ func (ec *executionContext) _Series_episodes(ctx context.Context, field graphql.
 		Object:     "Series",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Episodes, nil
+		return ec.resolvers.Series().Episodes(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2010,8 +2013,8 @@ func (ec *executionContext) _Video_renditions(ctx context.Context, field graphql
 		Object:     "Video",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
@@ -2024,7 +2027,7 @@ func (ec *executionContext) _Video_renditions(ctx context.Context, field graphql
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Renditions, nil
+		return ec.resolvers.Video().Renditions(rctx, obj, args["quality"].(*model.QualityFilter))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3600,7 +3603,7 @@ func (ec *executionContext) unmarshalInputQualityFilter(ctx context.Context, obj
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("resolution"))
-			it.Resolution, err = ec.unmarshalOResolution2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐResolution(ctx, v)
+			it.Resolution, err = ec.unmarshalOResolution2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -3936,22 +3939,31 @@ func (ec *executionContext) _Series(ctx context.Context, sel ast.SelectionSet, o
 		case "id":
 			out.Values[i] = ec._Series_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._Series_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "sortName":
 			out.Values[i] = ec._Series_sortName(ctx, field, obj)
 		case "artwork":
 			out.Values[i] = ec._Series_artwork(ctx, field, obj)
 		case "episodes":
-			out.Values[i] = ec._Series_episodes(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Series_episodes(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3992,7 +4004,16 @@ func (ec *executionContext) _Video(ctx context.Context, sel ast.SelectionSet, ob
 				atomic.AddUint32(&invalids, 1)
 			}
 		case "renditions":
-			out.Values[i] = ec._Video_renditions(ctx, field, obj)
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Video_renditions(ctx, field, obj)
+				return res
+			})
 		case "artwork":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -4410,14 +4431,19 @@ func (ec *executionContext) marshalNRendition2ᚖgithubᚗcomᚋidiomaticᚋtvql
 	return ec._Rendition(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNResolution2githubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐResolution(ctx context.Context, v interface{}) (model.Resolution, error) {
-	var res model.Resolution
-	err := res.UnmarshalGQL(v)
+func (ec *executionContext) unmarshalNResolution2string(ctx context.Context, v interface{}) (string, error) {
+	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNResolution2githubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐResolution(ctx context.Context, sel ast.SelectionSet, v model.Resolution) graphql.Marshaler {
-	return v
+func (ec *executionContext) marshalNResolution2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
+	res := graphql.MarshalString(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) marshalNSeries2ᚕᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeriesᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Series) graphql.Marshaler {
@@ -5016,20 +5042,19 @@ func (ec *executionContext) marshalORendition2ᚕᚖgithubᚗcomᚋidiomaticᚋt
 	return ret
 }
 
-func (ec *executionContext) unmarshalOResolution2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐResolution(ctx context.Context, v interface{}) (*model.Resolution, error) {
+func (ec *executionContext) unmarshalOResolution2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
 	if v == nil {
 		return nil, nil
 	}
-	var res = new(model.Resolution)
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
+	res, err := graphql.UnmarshalString(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOResolution2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐResolution(ctx context.Context, sel ast.SelectionSet, v *model.Resolution) graphql.Marshaler {
+func (ec *executionContext) marshalOResolution2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	return v
+	return graphql.MarshalString(*v)
 }
 
 func (ec *executionContext) unmarshalOSeriesFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeriesFilter(ctx context.Context, v interface{}) (*model.SeriesFilter, error) {

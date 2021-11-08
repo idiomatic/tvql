@@ -86,6 +86,7 @@ input ContributorFilter {
 
 type Quality {
   videoCodec: VideoCodec!
+
   resolution: Resolution!
   transcodeBudget: TranscodeBudget
 }
@@ -96,21 +97,17 @@ input QualityFilter {
 }
 
 enum VideoCodec {
-  H265
-  H264
+  h265
+  h264
 }
 
-enum Resolution {
-  _1080P
-  _720P
-  _480P
-}
+scalar Resolution
 
 enum TranscodeBudget {
-  SUPER_HQ
+  Super_HQ
   HQ
-  FAST
-  VERY_FAST
+  Fast
+  Very_Fast
 }
 
 
@@ -118,6 +115,7 @@ input GeometryFilter {
   width: Int
   height: Int
 }
+
 
 scalar Jpeg			# base64
 

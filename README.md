@@ -6,13 +6,13 @@ See [schema](graph/schema.graphqls).
 
 This demonstrates:
 
-* query filters (_e.g._, `video(title: $title) ...`)
-* query pagination cursors (_e.g._, `video(paginate: {first:3, after:$id}) ...`)
-* iTunes "mp4" metadata extraction (_e.g._, `video { title description genre artwork }`)
-* on-the-fly cover art resizing (_e.g._, `video { artwork(geometry: {height: 360}) }`)
-* video rendition coalescing: combining similar videos from different transcode profiles (_e.g._, `video { renditions { url size }}`)
-* URL resource generation to embedded HTTP server (`http://localhost:$PORT/video/`)
-* filesystem tree traversal (`$ROOT`)
+* query filters (_e.g._, `video(id: $id) ...` or `videos(title: $title) ...`)
+* query pagination cursors (_e.g._, `videos(paginate: {first:3, after:$id}) ...`)
+* iTunes "mp4" metadata extraction (_e.g._, `videos { title description genre artwork }`)
+* on-the-fly cover art resizing (_e.g._, `videos { artwork(geometry: {height: 360}) }`)
+* video rendition coalescing: combining similar videos from different transcode profiles (_e.g._, `videos { title releaseYear renditions { url size quality { resolution videoCodec transcodeBudget }}}`)
+* URL resource generation to embedded HTTP server (at `http://localhost:$PORT/video/...`)
+* filesystem tree traversal (at `$ROOT`)
 
 
 ## miscellaneous mp4 specs

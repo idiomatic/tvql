@@ -58,3 +58,9 @@ models:
     fields:
       artwork:
         resolver: true
+      renditions:
+        resolver: true
+  Series:
+    fields:
+      episodes:
+        resolver: true

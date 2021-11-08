@@ -21,13 +21,17 @@ import (
 // It serves as dependency injection for your app, add any dependencies you require here.
 
 type Resolver struct {
-	videos  []*model.Video
+	//videos  []*model.Video
+	videos  map[string]*model.Video
+	series  map[string]*model.Series
 	artwork map[string][]byte
 	mutex   sync.Mutex
 }
 
 func NewResolver() *Resolver {
 	return &Resolver{
+		videos:  make(map[string]*model.Video),
+		series:  make(map[string]*model.Series),
 		artwork: make(map[string][]byte),
 	}
 }
@@ -40,6 +44,54 @@ func hashToStr(payload string) string {
 func idFromTitleAndYear(title string, releaseYear int) string {
 	key := fmt.Sprintf("%s (%d)", title, releaseYear)
 	return hashToStr(key)
+}
+
+func qualityFromPath(path string) *model.Quality {
+	// HACK
+
+	q := &model.Quality{
+		VideoCodec: model.VideoCodecH264,
+	}
+
+	for {
+		parent := filepath.Dir(path)
+		if parent == "" || parent == "/" || parent == "." {
+			break
+		}
+		pathElement := filepath.Base(parent)
+		path = parent
+
+		switch {
+		case strings.Contains(pathElement, "--encoder=x265"):
+			q.VideoCodec = model.VideoCodecH265
+		}
+
+		switch {
+		case strings.Contains(pathElement, " 480p30"):
+			q.Resolution = "480p"
+		case strings.Contains(pathElement, " 720p30"):
+			q.Resolution = "720p"
+		case strings.Contains(pathElement, " 1080p30"):
+			q.Resolution = "1080p"
+		}
+
+		switch {
+		case strings.HasPrefix(pathElement, "Very Fast "):
+			b := model.TranscodeBudgetVeryFast
+			q.TranscodeBudget = &b
+		case strings.HasPrefix(pathElement, "Fast "):
+			b := model.TranscodeBudgetFast
+			q.TranscodeBudget = &b
+		case strings.HasPrefix(pathElement, "HQ "):
+			b := model.TranscodeBudgetHq
+			q.TranscodeBudget = &b
+		case strings.HasPrefix(pathElement, "Super HQ "):
+			b := model.TranscodeBudgetSuperHq
+			q.TranscodeBudget = &b
+		}
+	}
+
+	return q
 }
 
 func (r *Resolver) Survey(root string, base url.URL) error {
@@ -78,24 +130,19 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 
 				id := idFromTitleAndYear(title, releaseYear)
 				r.mutex.Lock()
-				var video *model.Video
-				for _, v := range r.videos {
-					if v.ID == id {
-						video = v
-						break
-					}
-				}
-				if video == nil {
+				video, ok := r.videos[id]
+				if !ok {
 					video = &model.Video{
 						ID: id, Title: title, ReleaseYear: releaseYear,
 					}
-					r.videos = append(r.videos, video)
+					r.videos[id] = video
 				}
 				r.mutex.Unlock()
 
 				if st, err := videoFile.SortTitle(); err == nil {
 					video.SortTitle = &st
 				}
+				// XXX else video.SortTitle = videoSortableTitle()
 
 				if g, err := videoFile.Genre(); err == nil {
 					video.Genre = &g
@@ -113,13 +160,24 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 
 				// XXX switch off mediakind?
 				if tvshow, err := videoFile.TVShow(); err == nil && tvshow != "" {
-					video.Episode = &model.Episode{}
-					video.Episode.Series = &model.Series{
-						ID:   hashToStr(tvshow),
-						Name: tvshow,
+					seriesID := hashToStr(tvshow)
+					r.mutex.Lock()
+					series, ok := r.series[seriesID]
+					if !ok {
+						series = &model.Series{ID: seriesID, Name: tvshow}
+						r.series[seriesID] = series
 					}
-					video.Episode.Season, _ = videoFile.TVSeason()
-					video.Episode.Episode, _ = videoFile.TVEpisode()
+					r.mutex.Unlock()
+
+					season, _ := videoFile.TVSeason()
+					episode, _ := videoFile.TVEpisode()
+
+					video.Episode = &model.Episode{
+						Series:  series,
+						Season:  season,
+						Episode: episode,
+						Video:   video, // XXX circular reference loop
+					}
 				}
 
 				return video, nil
@@ -137,9 +195,10 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 			resolvedURL := base.ResolveReference(relativeURL)
 
 			rendition := &model.Rendition{
-				ID:   hashToStr(path),
-				URL:  resolvedURL.String(),
-				Size: int(info.Size()),
+				ID:      hashToStr(path),
+				URL:     resolvedURL.String(),
+				Size:    int(info.Size()),
+				Quality: qualityFromPath(path),
 			}
 
 			r.mutex.Lock()
