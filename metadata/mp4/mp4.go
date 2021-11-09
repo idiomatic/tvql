@@ -85,6 +85,8 @@ func (f *File) survey() error {
 						// tv network
 					case mp4.StrToBoxType("tvsh"):
 						f.tvsh = data
+					case mp4.StrToBoxType("sosn"):
+						f.sosn = data
 					case mp4.StrToBoxType("tvsn"):
 						f.tvsn = data
 					case mp4.StrToBoxType("tves"):
