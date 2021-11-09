@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-func trimArticle(s string) string {
+func SortableTitle(s string) string {
 	s = strings.TrimPrefix(s, "The ")
 	s = strings.TrimPrefix(s, "A ")
 	s = strings.TrimPrefix(s, "An ")
@@ -14,25 +14,27 @@ func trimArticle(s string) string {
 type ByVideoTitle []*Video
 
 func (a ByVideoTitle) Len() int           { return len(a) }
-func (a ByVideoTitle) Less(i, j int) bool { return a[i].SortableTitle() < a[j].SortableTitle() }
+func (a ByVideoTitle) Less(i, j int) bool { return a[i].SortTitle < a[j].SortTitle }
 func (a ByVideoTitle) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-
-func (v *Video) SortableTitle() string {
-	if v.SortTitle != nil {
-		return *v.SortTitle
-	}
-	return trimArticle(v.Title)
-}
 
 type BySeriesName []*Series
 
 func (a BySeriesName) Len() int           { return len(a) }
-func (a BySeriesName) Less(i, j int) bool { return a[i].SortableName() < a[j].SortableName() }
+func (a BySeriesName) Less(i, j int) bool { return a[i].SortName < a[j].SortName }
 func (a BySeriesName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
-func (s *Series) SortableName() string {
-	if s.SortName != nil {
-		return *s.SortName
+type ByEpisode []*Episode
+
+func (a ByEpisode) Len() int { return len(a) }
+func (a ByEpisode) Less(i, j int) bool {
+	if a[i].Series.SortName != a[j].Series.SortName {
+		return a[i].Series.SortName < a[j].Series.SortName
 	}
-	return trimArticle(s.Name)
+
+	if a[i].Season != a[j].Season {
+		return a[i].Season < a[j].Season
+	}
+
+	return a[i].Episode < a[j].Episode
 }
+func (a ByEpisode) Swap(i, j int) { a[i], a[j] = a[j], a[i] }

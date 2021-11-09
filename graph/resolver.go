@@ -139,10 +139,11 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				}
 				r.mutex.Unlock()
 
-				if st, err := videoFile.SortTitle(); err == nil {
-					video.SortTitle = &st
+				sortTitle, _ := videoFile.SortTitle()
+				if sortTitle == "" {
+					sortTitle = model.SortableTitle(title)
 				}
-				// XXX else video.SortTitle = videoSortableTitle()
+				video.SortTitle = sortTitle
 
 				if g, err := videoFile.Genre(); err == nil {
 					video.Genre = &g
@@ -159,19 +160,20 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				}
 
 				// XXX switch off mediakind?
-				if tvshow, err := videoFile.TVShowName(); err == nil && tvshow != "" {
-					seriesID := hashToStr(tvshow)
-					sortShowName, _ := videoFile.TVSortShowName()
+				if seriesName, err := videoFile.TVShowName(); err == nil && seriesName != "" {
+					seriesID := hashToStr(seriesName)
+					sortSeriesName, _ := videoFile.TVSortShowName()
+					if sortSeriesName != "" {
+						sortSeriesName = model.SortableTitle(seriesName)
+					}
 
 					r.mutex.Lock()
 					series, ok := r.series[seriesID]
 					if !ok {
 						series = &model.Series{
-							ID:   seriesID,
-							Name: tvshow,
-						}
-						if sortShowName != "" {
-							series.SortName = &sortShowName
+							ID:       seriesID,
+							Name:     seriesName,
+							SortName: sortSeriesName,
 						}
 
 						r.series[seriesID] = series

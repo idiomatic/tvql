@@ -35,7 +35,6 @@ type Config struct {
 }
 
 type ResolverRoot interface {
-	Mutation() MutationResolver
 	Query() QueryResolver
 	Series() SeriesResolver
 	Video() VideoResolver
@@ -55,10 +54,6 @@ type ComplexityRoot struct {
 		Season  func(childComplexity int) int
 		Series  func(childComplexity int) int
 		Video   func(childComplexity int) int
-	}
-
-	Mutation struct {
-		SetTomatometer func(childComplexity int, id string, tomatometer int) int
 	}
 
 	Quality struct {
@@ -93,26 +88,23 @@ type ComplexityRoot struct {
 	}
 
 	Video struct {
-		Artwork     func(childComplexity int, geometry *model.GeometryFilter) int
-		Cast        func(childComplexity int) int
-		Description func(childComplexity int) int
-		Directors   func(childComplexity int) int
-		Episode     func(childComplexity int) int
-		Genre       func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Rating      func(childComplexity int) int
-		ReleaseYear func(childComplexity int) int
-		Renditions  func(childComplexity int, quality *model.QualityFilter) int
-		SortTitle   func(childComplexity int) int
-		Title       func(childComplexity int) int
-		Tomatometer func(childComplexity int) int
-		Writers     func(childComplexity int) int
+		Artwork       func(childComplexity int, geometry *model.GeometryFilter) int
+		Cast          func(childComplexity int) int
+		ContentRating func(childComplexity int) int
+		Description   func(childComplexity int) int
+		Directors     func(childComplexity int) int
+		Episode       func(childComplexity int) int
+		Genre         func(childComplexity int) int
+		ID            func(childComplexity int) int
+		ReleaseYear   func(childComplexity int) int
+		Renditions    func(childComplexity int, quality *model.QualityFilter) int
+		SortTitle     func(childComplexity int) int
+		Title         func(childComplexity int) int
+		Tomatometer   func(childComplexity int) int
+		Writers       func(childComplexity int) int
 	}
 }
 
-type MutationResolver interface {
-	SetTomatometer(ctx context.Context, id string, tomatometer int) (*model.Video, error)
-}
 type QueryResolver interface {
 	Video(ctx context.Context, id string) (*model.Video, error)
 	Videos(ctx context.Context, paginate *model.Paginate, title *string, contributor *model.ContributorFilter) ([]*model.Video, error)
@@ -183,18 +175,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Episode.Video(childComplexity), true
-
-	case "Mutation.setTomatometer":
-		if e.complexity.Mutation.SetTomatometer == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_setTomatometer_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.SetTomatometer(childComplexity, args["id"].(string), args["tomatometer"].(int)), true
 
 	case "Quality.resolution":
 		if e.complexity.Quality.Resolution == nil {
@@ -373,6 +353,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Video.Cast(childComplexity), true
 
+	case "Video.contentRating":
+		if e.complexity.Video.ContentRating == nil {
+			break
+		}
+
+		return e.complexity.Video.ContentRating(childComplexity), true
+
 	case "Video.description":
 		if e.complexity.Video.Description == nil {
 			break
@@ -407,13 +394,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Video.ID(childComplexity), true
-
-	case "Video.rating":
-		if e.complexity.Video.Rating == nil {
-			break
-		}
-
-		return e.complexity.Video.Rating(childComplexity), true
 
 	case "Video.releaseYear":
 		if e.complexity.Video.ReleaseYear == nil {
@@ -486,20 +466,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 				Data: buf.Bytes(),
 			}
 		}
-	case ast.Mutation:
-		return func(ctx context.Context) *graphql.Response {
-			if !first {
-				return nil
-			}
-			first = false
-			data := ec._Mutation(ctx, rc.Operation.SelectionSet)
-			var buf bytes.Buffer
-			data.MarshalGQL(&buf)
-
-			return &graphql.Response{
-				Data: buf.Bytes(),
-			}
-		}
 
 	default:
 		return graphql.OneShot(graphql.ErrorResponse(ctx, "unsupported GraphQL operation"))
@@ -549,13 +515,6 @@ type Query {
 }
 
 
-"Mutations."
-type Mutation {
-  # transitional until backend scraper and storage
-  setTomatometer(id: ID!, tomatometer: Int!): Video!
-}
-
-
 "Video details."
 type Video {
   """
@@ -571,14 +530,14 @@ type Video {
   title: String!
 
   """
-  Sortable title (optional).
+  Sortable title.
   Omits leading articles such as "The", "A", or "An".
-  Destyleized and normalized (i.e., "Se7en" => "Seven").
-  Normalized to first in the series (i.e., "Fast & Furious 2").
+  Destyleized and normalized (e.g., "Se7en" => "Seven").
+  Normalized the series (e.g., "Fast & Furious 2").
   Includes explicit episode arabic-number for sequels (as roman numerals are not readily sortable).
   Currently derived from the mp4 moov.udta.meta.ilst.sonm.data atom.
   """
-  sortTitle: String
+  sortTitle: String!
 
   """
   Year of initial/theatrical release.
@@ -625,7 +584,7 @@ type Video {
   genre: String
 
   "Content advisory rating (optional)."
-  rating: String
+  contentRating: String
 
   "Rotten Tomatoes reviewer score (optional)."
   tomatometer: Int
@@ -660,7 +619,7 @@ type Rendition {
   duration: Int
 
   """
-  Is video high definition, i.e., 1080p resolution?
+  Is video high definition, i.e., 1080p?
   Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
   """
   isHD: Boolean
@@ -698,11 +657,11 @@ type Series {
   name: String!
 
   """
-  Sortable name (optional).
+  Sortable name.
   Omits leading articles such as "The", "A", or "An".
   Currently derived from the mp4 moov.udta.meta.ilst.sosn.data atom.
   """
-  sortName: String
+  sortName: String!
 
   """
   Series image (optional).
@@ -798,30 +757,6 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
-
-func (ec *executionContext) field_Mutation_setTomatometer_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["id"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["id"] = arg0
-	var arg1 int
-	if tmp, ok := rawArgs["tomatometer"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tomatometer"))
-		arg1, err = ec.unmarshalNInt2int(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["tomatometer"] = arg1
-	return args, nil
-}
 
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -1193,48 +1128,6 @@ func (ec *executionContext) _Episode_video(ctx context.Context, field graphql.Co
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.Video, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*model.Video)
-	fc.Result = res
-	return ec.marshalNVideo2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐVideo(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Mutation_setTomatometer(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_setTomatometer_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SetTomatometer(rctx, args["id"].(string), args["tomatometer"].(int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1923,11 +1816,14 @@ func (ec *executionContext) _Series_sortName(ctx context.Context, field graphql.
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Series_artwork(ctx context.Context, field graphql.CollectedField, obj *model.Series) (ret graphql.Marshaler) {
@@ -2099,11 +1995,14 @@ func (ec *executionContext) _Video_sortTitle(ctx context.Context, field graphql.
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Video_releaseYear(ctx context.Context, field graphql.CollectedField, obj *model.Video) (ret graphql.Marshaler) {
@@ -2379,7 +2278,7 @@ func (ec *executionContext) _Video_genre(ctx context.Context, field graphql.Coll
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Video_rating(ctx context.Context, field graphql.CollectedField, obj *model.Video) (ret graphql.Marshaler) {
+func (ec *executionContext) _Video_contentRating(ctx context.Context, field graphql.CollectedField, obj *model.Video) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2397,7 +2296,7 @@ func (ec *executionContext) _Video_rating(ctx context.Context, field graphql.Col
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Rating, nil
+		return obj.ContentRating, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3873,37 +3772,6 @@ func (ec *executionContext) _Episode(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
-var mutationImplementors = []string{"Mutation"}
-
-func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, mutationImplementors)
-
-	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
-		Object: "Mutation",
-	})
-
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Mutation")
-		case "setTomatometer":
-			out.Values[i] = ec._Mutation_setTomatometer(ctx, field)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var qualityImplementors = []string{"Quality"}
 
 func (ec *executionContext) _Quality(ctx context.Context, sel ast.SelectionSet, obj *model.Quality) graphql.Marshaler {
@@ -4095,6 +3963,9 @@ func (ec *executionContext) _Series(ctx context.Context, sel ast.SelectionSet, o
 			}
 		case "sortName":
 			out.Values[i] = ec._Series_sortName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "artwork":
 			out.Values[i] = ec._Series_artwork(ctx, field, obj)
 		case "episodes":
@@ -4145,6 +4016,9 @@ func (ec *executionContext) _Video(ctx context.Context, sel ast.SelectionSet, ob
 			}
 		case "sortTitle":
 			out.Values[i] = ec._Video_sortTitle(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "releaseYear":
 			out.Values[i] = ec._Video_releaseYear(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -4182,8 +4056,8 @@ func (ec *executionContext) _Video(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Video_cast(ctx, field, obj)
 		case "genre":
 			out.Values[i] = ec._Video_genre(ctx, field, obj)
-		case "rating":
-			out.Values[i] = ec._Video_rating(ctx, field, obj)
+		case "contentRating":
+			out.Values[i] = ec._Video_contentRating(ctx, field, obj)
 		case "tomatometer":
 			out.Values[i] = ec._Video_tomatometer(ctx, field, obj)
 		case "episode":

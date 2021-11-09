@@ -12,10 +12,6 @@ import (
 	"github.com/idiomatic/tvql/graph/model"
 )
 
-func (r *mutationResolver) SetTomatometer(ctx context.Context, id string, tomatometer int) (*model.Video, error) {
-	panic(fmt.Errorf("not implemented"))
-}
-
 func (r *queryResolver) Video(ctx context.Context, id string) (*model.Video, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -71,7 +67,6 @@ func (r *queryResolver) Series(ctx context.Context, paginate *model.Paginate) ([
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	// unique series
 	var matches []*model.Series
 	for _, series := range r.series {
 		matches = append(matches, series)
@@ -116,7 +111,7 @@ func (r *queryResolver) Episodes(ctx context.Context, series *model.SeriesFilter
 		matches = append(matches, video.Episode)
 	}
 
-	// XXX sort by Series.Name then Series.Season then Series.Episode
+	sort.Sort(model.ByEpisode(matches))
 
 	return matches, nil
 }
@@ -149,9 +144,6 @@ func (r *videoResolver) Artwork(ctx context.Context, obj *model.Video, geometry 
 	return r.resizeArtwork(ctx, obj, geometry)
 }
 
-// Mutation returns generated.MutationResolver implementation.
-func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
-
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
@@ -161,7 +153,6 @@ func (r *Resolver) Series() generated.SeriesResolver { return &seriesResolver{r}
 // Video returns generated.VideoResolver implementation.
 func (r *Resolver) Video() generated.VideoResolver { return &videoResolver{r} }
 
-type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type seriesResolver struct{ *Resolver }
 type videoResolver struct{ *Resolver }

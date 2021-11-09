@@ -73,7 +73,7 @@ type Rendition struct {
 	Quality *Quality `json:"quality"`
 	// Length of video, in minutes.
 	Duration *int `json:"duration"`
-	// Is video high definition, i.e., 1080p resolution?
+	// Is video high definition, i.e., 1080p?
 	// Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
 	IsHd *bool `json:"isHD"`
 	// Size of the video, in bytes.
@@ -88,10 +88,10 @@ type Series struct {
 	// May include reboot qualifiers (e.g., "The Twilight Zone (2019)").
 	// Currently derived from the mp4 moov.udta.meta.ilst.tvsh.data atom.
 	Name string `json:"name"`
-	// Sortable name (optional).
+	// Sortable name.
 	// Omits leading articles such as "The", "A", or "An".
 	// Currently derived from the mp4 moov.udta.meta.ilst.sosn.data atom.
-	SortName *string `json:"sortName"`
+	SortName string `json:"sortName"`
 	// Series image (optional).
 	// NYI.
 	// Base64 encoded JPEG.
@@ -114,13 +114,13 @@ type Video struct {
 	// Title, in en-US, without cut or year parenthetical qualifiers.
 	// Currently derived from the mp4 moov.udta.meta.ilst.©nam.data atom.
 	Title string `json:"title"`
-	// Sortable title (optional).
+	// Sortable title.
 	// Omits leading articles such as "The", "A", or "An".
-	// Destyleized and normalized (i.e., "Se7en" => "Seven").
-	// Normalized to first in the series (i.e., "Fast & Furious 2").
+	// Destyleized and normalized (e.g., "Se7en" => "Seven").
+	// Normalized the series (e.g., "Fast & Furious 2").
 	// Includes explicit episode arabic-number for sequels (as roman numerals are not readily sortable).
 	// Currently derived from the mp4 moov.udta.meta.ilst.sonm.data atom.
-	SortTitle *string `json:"sortTitle"`
+	SortTitle string `json:"sortTitle"`
 	// Year of initial/theatrical release.
 	// Per Gregorian calendar.
 	// Required due to remake ambiguity.
@@ -148,7 +148,7 @@ type Video struct {
 	// Currently derived from the mp4 moov.udta.meta.ilst.©gen.data atom.
 	Genre *string `json:"genre"`
 	// Content advisory rating (optional).
-	Rating *string `json:"rating"`
+	ContentRating *string `json:"contentRating"`
 	// Rotten Tomatoes reviewer score (optional).
 	Tomatometer *int `json:"tomatometer"`
 	// Episodic details (optional).

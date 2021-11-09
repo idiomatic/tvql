@@ -21,13 +21,6 @@ type Query {
 }
 
 
-"Mutations."
-type Mutation {
-  # transitional until backend scraper and storage
-  setTomatometer(id: ID!, tomatometer: Int!): Video!
-}
-
-
 "Video details."
 type Video {
   """
@@ -43,14 +36,14 @@ type Video {
   title: String!
 
   """
-  Sortable title (optional).
+  Sortable title.
   Omits leading articles such as "The", "A", or "An".
-  Destyleized and normalized (i.e., "Se7en" => "Seven").
-  Normalized to first in the series (i.e., "Fast & Furious 2").
+  Destyleized and normalized (e.g., "Se7en" => "Seven").
+  Normalized the series (e.g., "Fast & Furious 2").
   Includes explicit episode arabic-number for sequels (as roman numerals are not readily sortable).
   Currently derived from the mp4 moov.udta.meta.ilst.sonm.data atom.
   """
-  sortTitle: String
+  sortTitle: String!
 
   """
   Year of initial/theatrical release.
@@ -97,7 +90,7 @@ type Video {
   genre: String
 
   "Content advisory rating (optional)."
-  rating: String
+  contentRating: String
 
   "Rotten Tomatoes reviewer score (optional)."
   tomatometer: Int
@@ -132,7 +125,7 @@ type Rendition {
   duration: Int
 
   """
-  Is video high definition, i.e., 1080p resolution?
+  Is video high definition, i.e., 1080p?
   Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
   """
   isHD: Boolean
@@ -170,11 +163,11 @@ type Series {
   name: String!
 
   """
-  Sortable name (optional).
+  Sortable name.
   Omits leading articles such as "The", "A", or "An".
   Currently derived from the mp4 moov.udta.meta.ilst.sosn.data atom.
   """
-  sortName: String
+  sortName: String!
 
   """
   Series image (optional).
