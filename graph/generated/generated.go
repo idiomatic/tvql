@@ -562,22 +562,27 @@ type Query {
   """
   Get a slice of videos.
   Filter by title and/or contributor (if specified).
-  Ordered by sort title (or cleaned title).
+  Ordered by sortTitle.
   """
   videos(paginate: Paginate, title: String, contributor: ContributorFilter): [Video!]!
 
-  "Get a slice of TV series, ordered by sort name (or cleaned name)."
+  """
+  Get a slice of TV series.
+  Ordered by series sortName.
+  """
   series(paginate: Paginate): [Series!]!
 
   """
   Get a list of TV seasons.
   Filter by series details (if specified).
+  Ordered by series sortName then season number.
   """
   seasons(series: SeriesFilter): [Season!]!
 
   """
   Get a list of TV episodes.
   Filter by season details (if specified).
+  Ordered by series sortName, season number, then episode number.
   """
   episodes(season: SeasonFilter): [Episode!]!
 }
@@ -587,13 +592,13 @@ type Query {
 type Video {
   """
   Video identity.
-  Currently a hash of title + releaseYear.
+  Currently a hash of title + releaseYear for idempotence.
   """
   id: ID!
 
   """
   Title, in en-US, without cut or year parenthetical qualifiers.
-  Currently derived from the mp4 moov.udta.meta.ilst.©nam.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.©nam.data atom.
   """
   title: String!
 
@@ -603,7 +608,7 @@ type Video {
   Destyleized and normalized (e.g., "Se7en" => "Seven").
   Normalized the series (e.g., "Fast & Furious 2").
   Includes explicit episode arabic-number for sequels (as roman numerals are not readily sortable).
-  Currently derived from the mp4 moov.udta.meta.ilst.sonm.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.sonm.data atom else derived from title.
   """
   sortTitle: String!
 
@@ -611,7 +616,7 @@ type Video {
   Year of initial/theatrical release.
   Per Gregorian calendar.
   Required due to remake ambiguity.
-  Currently derived from the mp4 moov.udta.meta.ilst.©day.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.©day.data atom.
   """
   releaseYear: Int!
 
@@ -626,13 +631,13 @@ type Video {
   Cover art image (optional).
   Base64 encoded JPEG.
   Downsampled per geometry (if specified).
-  Currently derived from the mp4 moov.udta.meta.ilst.covr.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.covr.data atom.
   """
   artwork(geometry: GeometryFilter): Jpeg
 
   """
   Description paragraph (optional).
-  Currently derived from the mp4 moov.udta.meta.ilst.desc.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.desc.data atom.
   """
   description: String
 
@@ -647,7 +652,7 @@ type Video {
 
   """
   Primary genre (optional).
-  Currently derived from the mp4 moov.udta.meta.ilst.©gen.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.©gen.data atom.
   """
   genre: String
 
@@ -670,7 +675,7 @@ type Contributor {
 
 "NYI"
 input ContributorFilter {
-  id: ID		       # will need contributor interning index
+  id: ID
   name: String
 }
 
@@ -683,14 +688,14 @@ type Series {
   """
   Series name.
   May include reboot qualifiers (e.g., "The Twilight Zone (2019)").
-  Currently derived from the mp4 moov.udta.meta.ilst.tvsh.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.tvsh.data atom.
   """
   name: String!
 
   """
   Sortable name.
   Omits leading articles such as "The", "A", or "An".
-  Currently derived from the mp4 moov.udta.meta.ilst.sosn.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.sosn.data atom else derived from name.
   """
   sortName: String!
 
@@ -709,6 +714,7 @@ type Series {
   episodes: [Episode!]!
 }
 
+"Series selection."
 input SeriesFilter {
   id: ID
   name: String
@@ -717,16 +723,21 @@ input SeriesFilter {
 
 "Season details."
 type Season {
+  """
+  Season identity.
+  Currently a hash of series name and season number for idempotence.
+  """
   id: ID!
   series: Series!
   season: Int!
   episodes: [Episode!]!
 }
 
+"Season selection."
 input SeasonFilter {
   id: ID
   series: SeriesFilter
-  season: Int			# paginator?
+  season: Int			# XXX paginator?
 }
 
 
@@ -738,9 +749,10 @@ type Episode {
   video: Video!
 }
 
+"Episode selection."
 input EpisodeFilter {
   season: SeasonFilter
-  episode: Int			# paginator?
+  episode: Int			# XXX paginator?
 }
 
 
@@ -748,7 +760,7 @@ input EpisodeFilter {
 type Rendition {
   """
   Rendition identity.
-  Currently a hash of local path.
+  Currently a hash of local path for idempotence.
   """
   id: ID!
 
@@ -770,7 +782,7 @@ type Rendition {
 
   """
   Is video high definition, i.e., 1080p?
-  Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
+  Currently obtained from the mp4 moov.udta.meta.ilst.hdvd.data atom.
   """
   isHD: Boolean
 
@@ -779,17 +791,23 @@ type Rendition {
 }
 
 
+"Quality details."
 type Quality {
   videoCodec: VideoCodec!
   resolution: Resolution!
   transcodeBudget: TranscodeBudget
 }
 
+"Quality selection."
 input QualityFilter {
   videoCodec: VideoCodec
   resolution: Resolution
 }
 
+"""
+Video codec.
+Useful for playback hardware limitations.
+"""
 enum VideoCodec {
   "h.265"
   h265
@@ -814,16 +832,21 @@ enum TranscodeBudget {
 }
 
 
+"Geometry selection."
 input GeometryFilter {
   width: Int
   height: Int
 }
 
 
-scalar Jpeg			# base64
+"""
+Jpeg image.
+Encoded in base64.
+"""
+scalar Jpeg
 
 
-"Slice of identifiable objects."
+"Select a slice of identifiable objects."
 input Paginate {
   """
   Maximum length of list returned (optional).
@@ -832,7 +855,7 @@ input Paginate {
   first: Int
 
   """
-  Return objects after this identified one.
+  Return objects after this identified one (optional).
   Requires a stable list.
   """
   after: ID

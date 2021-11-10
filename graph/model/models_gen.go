@@ -28,32 +28,36 @@ type Episode struct {
 	Video     *Video  `json:"video"`
 }
 
+// Episode selection.
 type EpisodeFilter struct {
 	Season  *SeasonFilter `json:"season"`
 	Episode *int          `json:"episode"`
 }
 
+// Geometry selection.
 type GeometryFilter struct {
 	Width  *int `json:"width"`
 	Height *int `json:"height"`
 }
 
-// Slice of identifiable objects.
+// Select a slice of identifiable objects.
 type Paginate struct {
 	// Maximum length of list returned (optional).
 	// If omitted, return remaining objects.
 	First *int `json:"first"`
-	// Return objects after this identified one.
+	// Return objects after this identified one (optional).
 	// Requires a stable list.
 	After *string `json:"after"`
 }
 
+// Quality details.
 type Quality struct {
 	VideoCodec      VideoCodec       `json:"videoCodec"`
 	Resolution      string           `json:"resolution"`
 	TranscodeBudget *TranscodeBudget `json:"transcodeBudget"`
 }
 
+// Quality selection.
 type QualityFilter struct {
 	VideoCodec *VideoCodec `json:"videoCodec"`
 	Resolution *string     `json:"resolution"`
@@ -62,7 +66,7 @@ type QualityFilter struct {
 // Video rendition details.
 type Rendition struct {
 	// Rendition identity.
-	// Currently a hash of local path.
+	// Currently a hash of local path for idempotence.
 	ID string `json:"id"`
 	// Video rendition download URL.
 	URL string `json:"url"`
@@ -75,7 +79,7 @@ type Rendition struct {
 	// Length of video, in minutes.
 	Duration *int `json:"duration"`
 	// Is video high definition, i.e., 1080p?
-	// Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.hdvd.data atom.
 	IsHd *bool `json:"isHD"`
 	// Size of the video, in bytes.
 	Size int `json:"size"`
@@ -83,12 +87,15 @@ type Rendition struct {
 
 // Season details.
 type Season struct {
+	// Season identity.
+	// Currently a hash of series name and season number for idempotence.
 	ID       string     `json:"id"`
 	Series   *Series    `json:"series"`
 	Season   int        `json:"season"`
 	Episodes []*Episode `json:"episodes"`
 }
 
+// Season selection.
 type SeasonFilter struct {
 	ID     *string       `json:"id"`
 	Series *SeriesFilter `json:"series"`
@@ -101,11 +108,11 @@ type Series struct {
 	ID string `json:"id"`
 	// Series name.
 	// May include reboot qualifiers (e.g., "The Twilight Zone (2019)").
-	// Currently derived from the mp4 moov.udta.meta.ilst.tvsh.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.tvsh.data atom.
 	Name string `json:"name"`
 	// Sortable name.
 	// Omits leading articles such as "The", "A", or "An".
-	// Currently derived from the mp4 moov.udta.meta.ilst.sosn.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.sosn.data atom else derived from name.
 	SortName string `json:"sortName"`
 	// Series image (optional).
 	// NYI.
@@ -118,6 +125,7 @@ type Series struct {
 	Episodes []*Episode `json:"episodes"`
 }
 
+// Series selection.
 type SeriesFilter struct {
 	ID   *string `json:"id"`
 	Name *string `json:"name"`
@@ -126,22 +134,22 @@ type SeriesFilter struct {
 // Video details.
 type Video struct {
 	// Video identity.
-	// Currently a hash of title + releaseYear.
+	// Currently a hash of title + releaseYear for idempotence.
 	ID string `json:"id"`
 	// Title, in en-US, without cut or year parenthetical qualifiers.
-	// Currently derived from the mp4 moov.udta.meta.ilst.©nam.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.©nam.data atom.
 	Title string `json:"title"`
 	// Sortable title.
 	// Omits leading articles such as "The", "A", or "An".
 	// Destyleized and normalized (e.g., "Se7en" => "Seven").
 	// Normalized the series (e.g., "Fast & Furious 2").
 	// Includes explicit episode arabic-number for sequels (as roman numerals are not readily sortable).
-	// Currently derived from the mp4 moov.udta.meta.ilst.sonm.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.sonm.data atom else derived from title.
 	SortTitle string `json:"sortTitle"`
 	// Year of initial/theatrical release.
 	// Per Gregorian calendar.
 	// Required due to remake ambiguity.
-	// Currently derived from the mp4 moov.udta.meta.ilst.©day.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.©day.data atom.
 	ReleaseYear int `json:"releaseYear"`
 	// List of various renditions of this video.
 	// Filter by rendition quality (if specified).
@@ -150,10 +158,10 @@ type Video struct {
 	// Cover art image (optional).
 	// Base64 encoded JPEG.
 	// Downsampled per geometry (if specified).
-	// Currently derived from the mp4 moov.udta.meta.ilst.covr.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.covr.data atom.
 	Artwork *string `json:"artwork"`
 	// Description paragraph (optional).
-	// Currently derived from the mp4 moov.udta.meta.ilst.desc.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.desc.data atom.
 	Description *string `json:"description"`
 	// NYI
 	Directors []*Contributor `json:"directors"`
@@ -162,7 +170,7 @@ type Video struct {
 	// NYI
 	Cast []*Contributor `json:"cast"`
 	// Primary genre (optional).
-	// Currently derived from the mp4 moov.udta.meta.ilst.©gen.data atom.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.©gen.data atom.
 	Genre *string `json:"genre"`
 	// Content advisory rating (optional).
 	ContentRating *string `json:"contentRating"`
@@ -218,6 +226,8 @@ func (e TranscodeBudget) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+// Video codec.
+// Useful for playback hardware limitations.
 type VideoCodec string
 
 const (
