@@ -168,8 +168,8 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				// XXX switch off mediakind?
 				if seriesName, err := videoFile.TVShowName(); err == nil && seriesName != "" {
 					seriesID := hashToStr(seriesName)
-					sortSeriesName, _ := videoFile.TVSortShowName()
-					if sortSeriesName != "" {
+					sortSeriesName, err := videoFile.TVSortShowName()
+					if err != nil || sortSeriesName == "" {
 						sortSeriesName = model.SortableTitle(seriesName)
 					}
 

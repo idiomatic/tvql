@@ -92,7 +92,7 @@ func (f *File) survey() error {
 					case mp4.StrToBoxType("tves"):
 						f.tves = data
 					case mp4.StrToBoxType("tven"):
-						// tv episode id
+						f.tven = data
 					case mp4.BoxType{0xA9, 'd', 'a', 'y'}:
 						f.day = data
 					case mp4.StrToBoxType("disk"):
@@ -285,12 +285,27 @@ func (f *File) TVEpisode() (int, error) {
 		return 0, err
 	}
 
-	if f.tvsn == nil {
+	if f.tves == nil {
 		return 0, errors.New("tves atom missing")
 	}
 
 	var episode int32
 	binary.Read(bytes.NewBuffer(f.tves.Data), binary.BigEndian, &episode)
+
+	return int(episode), nil
+}
+
+func (f *File) TVEpisodeID() (int, error) {
+	if err := f.survey(); err != nil {
+		return 0, err
+	}
+
+	if f.tven == nil {
+		return 0, errors.New("tven atom missing")
+	}
+
+	var episode int32
+	binary.Read(bytes.NewBuffer(f.tven.Data), binary.BigEndian, &episode)
 
 	return int(episode), nil
 }
