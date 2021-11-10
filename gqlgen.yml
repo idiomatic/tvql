@@ -60,7 +60,13 @@ models:
         resolver: true
       renditions:
         resolver: true
+  Season:
+    fields:
+      episodes:
+        resolver: true
   Series:
     fields:
+      seasons:
+        resolver: true
       episodes:
         resolver: true

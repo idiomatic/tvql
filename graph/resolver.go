@@ -22,6 +22,7 @@ import (
 
 type Resolver struct {
 	videos              map[string]*model.Video
+	seasons             map[string]*model.Season
 	series              map[string]*model.Series
 	artwork             map[string][]byte
 	ArtworkResizeHeight *int
@@ -31,6 +32,7 @@ type Resolver struct {
 func NewResolver() *Resolver {
 	return &Resolver{
 		videos:  make(map[string]*model.Video),
+		seasons: make(map[string]*model.Season),
 		series:  make(map[string]*model.Series),
 		artwork: make(map[string][]byte),
 	}
@@ -43,6 +45,11 @@ func hashToStr(payload string) string {
 
 func idFromTitleAndYear(title string, releaseYear int) string {
 	key := fmt.Sprintf("%s (%d)", title, releaseYear)
+	return hashToStr(key)
+}
+
+func idFromSeriesAndSeason(series string, season int) string {
+	key := fmt.Sprintf("%s (%d)", series, season)
 	return hashToStr(key)
 }
 
@@ -106,10 +113,10 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				return nil
 			}
 
-			video, err := func() (*model.Video, error) {
+			return func() error {
 				file, err := os.Open(path)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				defer file.Close()
 
@@ -133,17 +140,19 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				video, ok := r.videos[id]
 				if !ok {
 					video = &model.Video{
-						ID: id, Title: title, ReleaseYear: releaseYear,
+						ID:          id,
+						Title:       title,
+						ReleaseYear: releaseYear,
 					}
 					r.videos[id] = video
 				}
 				r.mutex.Unlock()
 
-				sortTitle, err := videoFile.SortTitle()
-				if err != nil || sortTitle == "" {
-					sortTitle = model.SortableTitle(title)
+				if sortTitle, err := videoFile.SortTitle(); err != nil || sortTitle == "" {
+					video.SortTitle = model.SortableTitle(title)
+				} else {
+					video.SortTitle = sortTitle
 				}
-				video.SortTitle = sortTitle
 
 				if g, err := videoFile.Genre(); err == nil && g != "" {
 					video.Genre = &g
@@ -156,10 +165,12 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				// XXX memory intensive
 				// XXX should out-of-process cache original and downsamples
 				if a, err := videoFile.CoverArt(); err == nil && len(a) > 0 {
-					// HACK downsample now
-					a, err = resizeArtwork(a, &model.GeometryFilter{Height: r.ArtworkResizeHeight})
-					if err != nil {
-						return nil, err
+					if r.ArtworkResizeHeight != nil {
+						// HACK downsample now
+						a, err = resizeArtwork(a, &model.GeometryFilter{Height: r.ArtworkResizeHeight})
+						if err != nil {
+							return err
+						}
 					}
 
 					r.artwork[video.ID] = a
@@ -167,55 +178,74 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 
 				// XXX switch off mediakind?
 				if seriesName, err := videoFile.TVShowName(); err == nil && seriesName != "" {
-					seriesID := hashToStr(seriesName)
-					sortSeriesName, err := videoFile.TVSortShowName()
-					if err != nil || sortSeriesName == "" {
-						sortSeriesName = model.SortableTitle(seriesName)
+					seasonNumber, err := videoFile.TVSeason()
+					if err != nil {
+						// HACK missing or zero season looks funny
+						seasonNumber = 1
 					}
+
+					episodeNumber, _ := videoFile.TVEpisode()
+
+					seasonID := idFromSeriesAndSeason(seriesName, seasonNumber)
+					seriesID := hashToStr(seriesName)
 
 					r.mutex.Lock()
 					series, ok := r.series[seriesID]
 					if !ok {
 						series = &model.Series{
-							ID:       seriesID,
-							Name:     seriesName,
-							SortName: sortSeriesName,
+							ID:   seriesID,
+							Name: seriesName,
 						}
-
 						r.series[seriesID] = series
+					}
+
+					season, ok := r.seasons[seasonID]
+					if !ok {
+						season = &model.Season{
+							ID:     seasonID,
+							Season: seasonNumber,
+							Series: series,
+						}
+						r.seasons[seasonID] = season
+					}
+
+					episode := video.Episode
+					if episode == nil {
+						episode = &model.Episode{
+							Season:  season,
+							Episode: episodeNumber,
+							Video:   video, // XXX circular reference loop
+						}
+						video.Episode = episode
 					}
 					r.mutex.Unlock()
 
-					season, _ := videoFile.TVSeason()
-					episode, _ := videoFile.TVEpisode()
-
-					video.Episode = &model.Episode{
-						Series:  series,
-						Season:  season,
-						Episode: episode,
-						Video:   video, // XXX circular reference loop
+					if sortSeriesName, err := videoFile.TVSortShowName(); err == nil && sortSeriesName != "" {
+						series.SortName = sortSeriesName
+					} else {
+						series.SortName = model.SortableTitle(seriesName)
 					}
 				}
 
-				return video, nil
+				relativePath := strings.TrimPrefix(strings.TrimPrefix(path, root), "/")
+				relativeURL := &url.URL{Path: relativePath}
+				resolvedURL := base.ResolveReference(relativeURL)
+
+				rendition := &model.Rendition{
+					ID:      hashToStr(path),
+					URL:     resolvedURL.String(),
+					Size:    int(info.Size()),
+					Quality: qualityFromPath(path),
+				}
+
+				{
+					r.mutex.Lock()
+					video.Renditions = append(video.Renditions, rendition)
+					r.mutex.Unlock()
+				}
+
+				return nil
 			}()
-
-			relativePath := strings.TrimPrefix(strings.TrimPrefix(path, root), "/")
-			relativeURL := &url.URL{Path: relativePath}
-			resolvedURL := base.ResolveReference(relativeURL)
-
-			rendition := &model.Rendition{
-				ID:      hashToStr(path),
-				URL:     resolvedURL.String(),
-				Size:    int(info.Size()),
-				Quality: qualityFromPath(path),
-			}
-
-			r.mutex.Lock()
-			video.Renditions = append(video.Renditions, rendition)
-			r.mutex.Unlock()
-
-			return nil
 		})
 	return err
 }

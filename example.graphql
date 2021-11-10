@@ -10,10 +10,12 @@
       url
     }
     episode {
-      series {
-        name
+      season {
+	series {
+          name
+	}
+	season
       }
-      season
       episode
     }
     artwork(geometry: {height: 36})

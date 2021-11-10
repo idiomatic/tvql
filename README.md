@@ -57,11 +57,14 @@ transcode profiles are combined.
         genre
         #artwork
         episode {
-          series {
-            name
+          season {
+            series {
+              name
+            }
+            season
           }
-          season
           episode
+        }
       }
     }
 
@@ -74,8 +77,10 @@ Otherwise, adapt the display title.
       videos {
         sortTitle
         episode {
-          series {
-            sortName
+          season {
+            series {
+              sortName
+            }
           }
         }
       }
@@ -97,12 +102,23 @@ Compatible with pagination.
       }
     }
 
-    query SortedEpisodes {
-      episodes {
+    query SortedSeasons {
+      seasons {
         series {
           sortName
         }
         season
+      }
+    }
+
+    query SortedEpisodes {
+      episodes {
+        season {
+          series {
+            sortName
+          }
+          season
+        }
         episode
       }
     }

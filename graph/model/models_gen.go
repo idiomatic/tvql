@@ -20,15 +20,15 @@ type ContributorFilter struct {
 
 // Episode (i.e., TV Show) details.
 type Episode struct {
-	Series  *Series `json:"series"`
-	Season  int     `json:"season"`
-	Episode int     `json:"episode"`
-	Video   *Video  `json:"video"`
+	Season    *Season `json:"season"`
+	Episode   int     `json:"episode"`
+	EpisodeID *string `json:"episodeID"`
+	Video     *Video  `json:"video"`
 }
 
 type EpisodeFilter struct {
 	Series  *SeriesFilter `json:"series"`
-	Season  *int          `json:"season"`
+	Season  *SeasonFilter `json:"season"`
 	Episode *int          `json:"episode"`
 }
 
@@ -80,6 +80,20 @@ type Rendition struct {
 	Size int `json:"size"`
 }
 
+// Season details.
+type Season struct {
+	ID       string     `json:"id"`
+	Series   *Series    `json:"series"`
+	Season   int        `json:"season"`
+	Episodes []*Episode `json:"episodes"`
+}
+
+type SeasonFilter struct {
+	ID     *string       `json:"id"`
+	Series *SeriesFilter `json:"series"`
+	Season *int          `json:"season"`
+}
+
 // Series details.
 type Series struct {
 	// Series identity.
@@ -97,6 +111,8 @@ type Series struct {
 	// Base64 encoded JPEG.
 	// Downsampled per geometry (if specified).
 	Artwork *string `json:"artwork"`
+	// List of seasons.
+	Seasons []*Season `json:"seasons"`
 	// List of episodes.
 	Episodes []*Episode `json:"episodes"`
 }

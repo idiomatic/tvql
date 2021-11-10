@@ -14,10 +14,16 @@ type Query {
   series(paginate: Paginate): [Series!]!
 
   """
-  Get a list of episodes.
+  Get a list of TV seasons.
   Filter by series details (if specified).
   """
-  episodes(series: SeriesFilter): [Episode!]!
+  seasons(series: SeriesFilter): [Season!]!
+
+  """
+  Get a list of TV episodes.
+  Filter by season details (if specified).
+  """
+  episodes(season: SeasonFilter): [Episode!]!
 }
 
 
@@ -137,16 +143,31 @@ type Rendition {
 
 "Episode (i.e., TV Show) details."
 type Episode {
-  series: Series!
-  season: Int!
+  season: Season!
   episode: Int!
+  episodeID: String
   video: Video!
 }
 
 input EpisodeFilter {
   series: SeriesFilter
-  season: Int
-  episode: Int
+  season: SeasonFilter
+  episode: Int			# paginator?
+}
+
+
+"Season details."
+type Season {
+  id: ID!
+  series: Series!
+  season: Int!
+  episodes: [Episode!]!
+}
+
+input SeasonFilter {
+  id: ID
+  series: SeriesFilter
+  season: Int			# paginator?
 }
 
 
@@ -176,6 +197,9 @@ type Series {
   Downsampled per geometry (if specified).
   """
   artwork(geometry: GeometryFilter): Jpeg
+
+  "List of seasons."
+  seasons: [Season!]!
 
   "List of episodes."
   episodes: [Episode!]!

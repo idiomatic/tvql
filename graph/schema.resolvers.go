@@ -16,13 +16,12 @@ func (r *queryResolver) Video(ctx context.Context, id string) (*model.Video, err
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	for _, video := range r.videos {
-		if video.ID == id {
-			return video, nil
-		}
+	video, ok := r.videos[id]
+	if !ok {
+		return nil, fmt.Errorf("video not found")
 	}
 
-	return nil, fmt.Errorf("video not found")
+	return video, nil
 }
 
 func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, title *string, contributor *model.ContributorFilter) ([]*model.Video, error) {
@@ -35,7 +34,6 @@ func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, ti
 
 	var matches []*model.Video
 	for _, video := range r.videos {
-		// filter by title
 		if title != nil && video.Title != *title {
 			continue
 		}
@@ -57,8 +55,6 @@ func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, ti
 	if paginate != nil && paginate.First != nil && len(matches) > *paginate.First {
 		matches = matches[:*paginate.First]
 	}
-
-	// XXX skip videos without suitable renditions
 
 	return matches, nil
 }
@@ -90,28 +86,103 @@ func (r *queryResolver) Series(ctx context.Context, paginate *model.Paginate) ([
 	return matches, nil
 }
 
-func (r *queryResolver) Episodes(ctx context.Context, series *model.SeriesFilter) ([]*model.Episode, error) {
+func (r *queryResolver) Seasons(ctx context.Context, series *model.SeriesFilter) ([]*model.Season, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	var matches []*model.Season
+	for _, season := range r.seasons {
+		if series != nil {
+			if season.Series.ID != *series.ID {
+				continue
+			}
+		}
+
+		matches = append(matches, season)
+	}
+
+	sort.Sort(model.BySeason(matches))
+
+	return matches, nil
+}
+
+func (r *queryResolver) Episodes(ctx context.Context, season *model.SeasonFilter) ([]*model.Episode, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	var matches []*model.Episode
 	for _, video := range r.videos {
-		if video.Episode == nil {
+		episode := video.Episode
+		if episode == nil {
 			continue
 		}
-		if series != nil {
-			if series.ID != nil && video.Episode.Series.ID != *series.ID {
-				continue
-			}
-			if series.Name != nil && video.Episode.Series.Name != *series.Name {
+
+		if season != nil {
+			if season.ID != nil && episode.Season.ID != *season.ID {
 				continue
 			}
 		}
 
-		matches = append(matches, video.Episode)
+		if season != nil && season.Series != nil {
+			if season.Series.ID != nil && episode.Season.Series.ID != *season.Series.ID {
+				continue
+			}
+
+			if season.Series.Name != nil && episode.Season.Series.Name != *season.Series.Name {
+				continue
+			}
+		}
+
+		matches = append(matches, episode)
 	}
 
 	sort.Sort(model.ByEpisode(matches))
+
+	return matches, nil
+}
+
+func (r *seasonResolver) Episodes(ctx context.Context, obj *model.Season) ([]*model.Episode, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	var matches []*model.Episode
+	for _, video := range r.videos {
+		episode := video.Episode
+		if episode == nil {
+			continue
+		}
+
+		if obj != nil {
+			if episode.Season.ID != obj.ID {
+				continue
+			}
+		}
+
+		matches = append(matches, episode)
+
+	}
+
+	sort.Sort(model.ByEpisode(matches))
+
+	return matches, nil
+}
+
+func (r *seriesResolver) Seasons(ctx context.Context, obj *model.Series) ([]*model.Season, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	var matches []*model.Season
+	for _, season := range r.seasons {
+		if obj != nil {
+			if season.Series.ID != obj.ID {
+				continue
+			}
+		}
+
+		matches = append(matches, season)
+	}
+
+	sort.Sort(model.BySeason(matches))
 
 	return matches, nil
 }
@@ -122,15 +193,21 @@ func (r *seriesResolver) Episodes(ctx context.Context, obj *model.Series) ([]*mo
 
 	var matches []*model.Episode
 	for _, video := range r.videos {
-		if video.Episode == nil {
-			continue
-		}
-		if video.Episode.Series != obj {
+		episode := video.Episode
+		if episode == nil {
 			continue
 		}
 
-		matches = append(matches, video.Episode)
+		if obj != nil {
+			if episode.Season.Series.ID != obj.ID {
+				continue
+			}
+		}
+
+		matches = append(matches, episode)
 	}
+
+	sort.Sort(model.ByEpisode(matches))
 
 	return matches, nil
 }
@@ -147,6 +224,9 @@ func (r *videoResolver) Artwork(ctx context.Context, obj *model.Video, geometry 
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// Season returns generated.SeasonResolver implementation.
+func (r *Resolver) Season() generated.SeasonResolver { return &seasonResolver{r} }
+
 // Series returns generated.SeriesResolver implementation.
 func (r *Resolver) Series() generated.SeriesResolver { return &seriesResolver{r} }
 
@@ -154,5 +234,6 @@ func (r *Resolver) Series() generated.SeriesResolver { return &seriesResolver{r}
 func (r *Resolver) Video() generated.VideoResolver { return &videoResolver{r} }
 
 type queryResolver struct{ *Resolver }
+type seasonResolver struct{ *Resolver }
 type seriesResolver struct{ *Resolver }
 type videoResolver struct{ *Resolver }
