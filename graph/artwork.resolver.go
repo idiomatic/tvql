@@ -44,7 +44,7 @@ func resizeArtwork(artwork []byte, geometry *model.GeometryFilter) ([]byte, erro
 		if height > size.Y {
 			height = size.Y
 		}
-		width = height * size.Y / size.X
+		width = height * size.X / size.Y
 	} else if geometry.Height == nil && geometry.Width != nil {
 		width = *geometry.Width
 		if width > size.X {

@@ -26,11 +26,12 @@ Find .m4v files within `$ROOT`.
 
 Served at http://localhost:$PORT/video/
 
-### video rendition coalescing
+### video renditions
 
-Similar videos from different transcode profiles are combined.
+Similar videos (_i.e._, same title and release year) with different
+transcode profiles are combined.
 
-    query {
+    query CombinedRenditions {
       videos {
         title
         releaseYear
@@ -48,7 +49,7 @@ Similar videos from different transcode profiles are combined.
 
 ### iTunes metadata extraction
 
-    query {
+    query ItunesAtoms {
       videos {
         title
         releaseYear
@@ -64,9 +65,12 @@ Similar videos from different transcode profiles are combined.
       }
     }
 
-### extracted or computed sortable names
+### extracted or computed sortable titles
 
-    query {
+If video has explicit iTunes metadata for a sortable title, use that.
+Otherwise, adapt the display title.
+
+    query Sortables {
       videos {
         sortTitle
         episode {
@@ -77,21 +81,23 @@ Similar videos from different transcode profiles are combined.
       }
     }
 
-### sorted results
+### sorted query results
     
-    query {
+Compatible with pagination.
+
+    query SortedVideos {
       videos {
         sortTitle
       }
     }
 
-    query {
+    query SortedSeries {
       series {
         sortName
       }
     }
 
-    query {
+    query SortedEpisodes {
       episodes {
         series {
           sortName
@@ -103,7 +109,7 @@ Similar videos from different transcode profiles are combined.
 
 ### on-the-fly cover art resizing
 
-    query {
+    query ArtworkResizing {
       videos {
         artwork(geometry: { height: 72 })
       }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -29,6 +30,8 @@ func main() {
 		root = defaultRoot
 	}
 
+	resizeHeight := os.Getenv("RESIZE_HEIGHT")
+
 	http.Handle("/video/",
 		http.StripPrefix("/video",
 			http.FileServer(http.Dir(root))))
@@ -38,6 +41,14 @@ func main() {
 	}
 
 	resolver := graph.NewResolver()
+	if resizeHeight != "" {
+		height, err := strconv.Atoi(resizeHeight)
+		if err != nil {
+			log.Panic(err)
+		}
+		resolver.ArtworkResizeHeight = &height
+	}
+
 	go func() {
 		err := resolver.Survey(root, *base)
 		if err != nil {

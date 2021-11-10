@@ -21,11 +21,11 @@ import (
 // It serves as dependency injection for your app, add any dependencies you require here.
 
 type Resolver struct {
-	//videos  []*model.Video
-	videos  map[string]*model.Video
-	series  map[string]*model.Series
-	artwork map[string][]byte
-	mutex   sync.Mutex
+	videos              map[string]*model.Video
+	series              map[string]*model.Series
+	artwork             map[string][]byte
+	ArtworkResizeHeight *int
+	mutex               sync.Mutex
 }
 
 func NewResolver() *Resolver {
@@ -118,12 +118,12 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				videoFile := mp4.NewFile(bufferedFile)
 
 				title, err := videoFile.Title()
-				if err != nil {
+				if err != nil || title == "" {
 					title = strings.TrimSuffix(filepath.Base(path), ext)
 				}
 
 				releaseDate, err := videoFile.ReleaseDate()
-				if err != nil {
+				if err != nil || releaseDate == "" {
 					releaseDate = "1900"
 				}
 				releaseYear, _ := strconv.Atoi(releaseDate[:4])
@@ -139,23 +139,29 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				}
 				r.mutex.Unlock()
 
-				sortTitle, _ := videoFile.SortTitle()
-				if sortTitle == "" {
+				sortTitle, err := videoFile.SortTitle()
+				if err != nil || sortTitle == "" {
 					sortTitle = model.SortableTitle(title)
 				}
 				video.SortTitle = sortTitle
 
-				if g, err := videoFile.Genre(); err == nil {
+				if g, err := videoFile.Genre(); err == nil && g != "" {
 					video.Genre = &g
 				}
 
-				if d, err := videoFile.Description(); err == nil {
+				if d, err := videoFile.Description(); err == nil && d != "" {
 					video.Description = &d
 				}
 
 				// XXX memory intensive
 				// XXX should out-of-process cache original and downsamples
-				if a, err := videoFile.CoverArt(); err == nil {
+				if a, err := videoFile.CoverArt(); err == nil && len(a) > 0 {
+					// HACK downsample now
+					a, err = resizeArtwork(a, &model.GeometryFilter{Height: r.ArtworkResizeHeight})
+					if err != nil {
+						return nil, err
+					}
+
 					r.artwork[video.ID] = a
 				}
 
@@ -194,15 +200,8 @@ func (r *Resolver) Survey(root string, base url.URL) error {
 				return video, nil
 			}()
 
-			relativeURL, err := url.Parse(
-				strings.TrimPrefix(
-					strings.TrimPrefix(path, root),
-					"/",
-				),
-			)
-			if err != nil {
-				return err
-			}
+			relativePath := strings.TrimPrefix(strings.TrimPrefix(path, root), "/")
+			relativeURL := &url.URL{Path: relativePath}
 			resolvedURL := base.ResolveReference(relativeURL)
 
 			rendition := &model.Rendition{
