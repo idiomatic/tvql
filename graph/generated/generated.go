@@ -662,68 +662,16 @@ type Video {
 }
 
 
-"Video rendition details."
-type Rendition {
-  """
-  Rendition identity.
-  Currently a hash of local path.
-  """
+"NYI"
+type Contributor {
   id: ID!
-
-  "Video rendition download URL."
-  url: String!
-
-  """
-  Cut (optional).
-  Omit wrapping parenthesis.
-  If absent, "theatrical" is implied.
-  """
-  cut: String
-
-  "Quality details."
-  quality: Quality!
-
-  "Length of video, in minutes."
-  duration: Int
-
-  """
-  Is video high definition, i.e., 1080p?
-  Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
-  """
-  isHD: Boolean
-
-  "Size of the video, in bytes."
-  size: Int!
+  name: String!
 }
 
-
-"Episode (i.e., TV Show) details."
-type Episode {
-  season: Season!
-  episode: Int!
-  episodeID: String
-  video: Video!
-}
-
-input EpisodeFilter {
-  series: SeriesFilter
-  season: SeasonFilter
-  episode: Int			# paginator?
-}
-
-
-"Season details."
-type Season {
-  id: ID!
-  series: Series!
-  season: Int!
-  episodes: [Episode!]!
-}
-
-input SeasonFilter {
-  id: ID
-  series: SeriesFilter
-  season: Int			# paginator?
+"NYI"
+input ContributorFilter {
+  id: ID		       # will need contributor interning index
+  name: String
 }
 
 
@@ -767,14 +715,67 @@ input SeriesFilter {
 }
 
 
-type Contributor {
+"Season details."
+type Season {
   id: ID!
-  name: String!
+  series: Series!
+  season: Int!
+  episodes: [Episode!]!
 }
 
-input ContributorFilter {
-  id: ID		       # will need contributor interning index
-  name: String
+input SeasonFilter {
+  id: ID
+  series: SeriesFilter
+  season: Int			# paginator?
+}
+
+
+"Episode (i.e., TV Show) details."
+type Episode {
+  season: Season!
+  episode: Int!
+  episodeID: String
+  video: Video!
+}
+
+input EpisodeFilter {
+  season: SeasonFilter
+  episode: Int			# paginator?
+}
+
+
+"Video rendition details."
+type Rendition {
+  """
+  Rendition identity.
+  Currently a hash of local path.
+  """
+  id: ID!
+
+  "Video rendition download URL."
+  url: String!
+
+  """
+  Cut (optional).
+  Omit wrapping parenthesis.
+  If absent, "theatrical" is implied.
+  """
+  cut: String
+
+  "Quality details."
+  quality: Quality!
+
+  "Length of video, in minutes."
+  duration: Int
+
+  """
+  Is video high definition, i.e., 1080p?
+  Currently derived from the mp4 moov.udta.meta.ilst.hdvd.data atom.
+  """
+  isHD: Boolean
+
+  "Size of the video, in bytes."
+  size: Int!
 }
 
 
@@ -3851,14 +3852,6 @@ func (ec *executionContext) unmarshalInputEpisodeFilter(ctx context.Context, obj
 
 	for k, v := range asMap {
 		switch k {
-		case "series":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("series"))
-			it.Series, err = ec.unmarshalOSeriesFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeriesFilter(ctx, v)
-			if err != nil {
-				return it, err
-			}
 		case "season":
 			var err error
 

@@ -22,8 +22,8 @@ import (
 
 type Resolver struct {
 	videos              map[string]*model.Video
-	seasons             map[string]*model.Season
 	series              map[string]*model.Series
+	seasons             map[string]*model.Season
 	artwork             map[string][]byte
 	ArtworkResizeHeight *int
 	mutex               sync.Mutex
@@ -32,8 +32,8 @@ type Resolver struct {
 func NewResolver() *Resolver {
 	return &Resolver{
 		videos:  make(map[string]*model.Video),
-		seasons: make(map[string]*model.Season),
 		series:  make(map[string]*model.Series),
+		seasons: make(map[string]*model.Season),
 		artwork: make(map[string][]byte),
 	}
 }

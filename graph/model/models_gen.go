@@ -8,11 +8,13 @@ import (
 	"strconv"
 )
 
+// NYI
 type Contributor struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
+// NYI
 type ContributorFilter struct {
 	ID   *string `json:"id"`
 	Name *string `json:"name"`
@@ -27,7 +29,6 @@ type Episode struct {
 }
 
 type EpisodeFilter struct {
-	Series  *SeriesFilter `json:"series"`
 	Season  *SeasonFilter `json:"season"`
 	Episode *int          `json:"episode"`
 }
