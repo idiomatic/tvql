@@ -1,4 +1,5 @@
-// +build tools
-package tools
-import _ "github.com/99designs/gqlgen"
+//go:build tools
 
+package main
+
+import _ "github.com/99designs/gqlgen"

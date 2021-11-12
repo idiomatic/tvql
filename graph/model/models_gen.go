@@ -22,16 +22,21 @@ type ContributorFilter struct {
 
 // Episode (i.e., TV Show) details.
 type Episode struct {
-	Season    *Season `json:"season"`
-	Episode   int     `json:"episode"`
+	// Season.
+	Season *Season `json:"season"`
+	// Episode number, within a season.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.tves.data atom.
+	Episode int `json:"episode"`
+	// Episode ID, within a series.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.tven.data atom.
 	EpisodeID *string `json:"episodeID"`
-	Video     *Video  `json:"video"`
+	// Video.
+	Video *Video `json:"video"`
 }
 
 // Episode selection.
 type EpisodeFilter struct {
-	Season  *SeasonFilter `json:"season"`
-	Episode *int          `json:"episode"`
+	Episode *int `json:"episode"`
 }
 
 // Geometry selection.
@@ -89,17 +94,22 @@ type Rendition struct {
 type Season struct {
 	// Season identity.
 	// Currently a hash of series name and season number for idempotence.
-	ID       string     `json:"id"`
-	Series   *Series    `json:"series"`
-	Season   int        `json:"season"`
+	ID string `json:"id"`
+	// Series.
+	Series *Series `json:"series"`
+	// Season number, within a series.
+	// Currently obtained from the mp4 moov.udta.meta.ilst.tvsn.data atom.
+	Season int `json:"season"`
+	// List of episodes in season.
 	Episodes []*Episode `json:"episodes"`
+	// Count of episodes in season.
+	EpisodeCount int `json:"episodeCount"`
 }
 
 // Season selection.
 type SeasonFilter struct {
-	ID     *string       `json:"id"`
-	Series *SeriesFilter `json:"series"`
-	Season *int          `json:"season"`
+	ID     *string `json:"id"`
+	Season *int    `json:"season"`
 }
 
 // Series details.
@@ -116,13 +126,14 @@ type Series struct {
 	SortName string `json:"sortName"`
 	// Series image (optional).
 	// NYI.
-	// Base64 encoded JPEG.
 	// Downsampled per geometry (if specified).
 	Artwork *string `json:"artwork"`
 	// List of seasons.
 	Seasons []*Season `json:"seasons"`
-	// List of episodes.
+	// List of episodes, regardless of season.
 	Episodes []*Episode `json:"episodes"`
+	// Count of episodes, regardless of season.
+	EpisodeCount int `json:"episodeCount"`
 }
 
 // Series selection.
@@ -156,7 +167,6 @@ type Video struct {
 	// Null or empty list implies this video is a placeholder, and renditions are coming soon.
 	Renditions []*Rendition `json:"renditions"`
 	// Cover art image (optional).
-	// Base64 encoded JPEG.
 	// Downsampled per geometry (if specified).
 	// Currently obtained from the mp4 moov.udta.meta.ilst.covr.data atom.
 	Artwork *string `json:"artwork"`

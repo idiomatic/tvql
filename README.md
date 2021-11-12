@@ -55,7 +55,7 @@ transcode profiles are combined.
         releaseYear
         description
         genre
-        #artwork
+        artwork
         episode {
           season {
             series {

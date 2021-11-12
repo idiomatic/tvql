@@ -64,9 +64,13 @@ models:
     fields:
       episodes:
         resolver: true
+      episodeCount:
+        resolver: true
   Series:
     fields:
       seasons:
         resolver: true
       episodes:
+        resolver: true
+      episodeCount:
         resolver: true

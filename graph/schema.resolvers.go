@@ -106,34 +106,10 @@ func (r *queryResolver) Seasons(ctx context.Context, series *model.SeriesFilter)
 	return matches, nil
 }
 
-func (r *queryResolver) Episodes(ctx context.Context, season *model.SeasonFilter) ([]*model.Episode, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	var matches []*model.Episode
-	for _, video := range r.videos {
-		episode := video.Episode
-		if episode == nil {
-			continue
-		}
-
-		if season != nil {
-			if season.ID != nil && episode.Season.ID != *season.ID {
-				continue
-			}
-		}
-
-		if season != nil && season.Series != nil {
-			if season.Series.ID != nil && episode.Season.Series.ID != *season.Series.ID {
-				continue
-			}
-
-			if season.Series.Name != nil && episode.Season.Series.Name != *season.Series.Name {
-				continue
-			}
-		}
-
-		matches = append(matches, episode)
+func (r *queryResolver) Episodes(ctx context.Context, series *model.SeriesFilter, season *model.SeasonFilter) ([]*model.Episode, error) {
+	matches, err := r.episodes(ctx, series, season)
+	if err != nil {
+		return nil, err
 	}
 
 	sort.Sort(model.ByEpisode(matches))
@@ -141,30 +117,33 @@ func (r *queryResolver) Episodes(ctx context.Context, season *model.SeasonFilter
 	return matches, nil
 }
 
+func (r *queryResolver) EpisodeCount(ctx context.Context, series *model.SeriesFilter, season *model.SeasonFilter) (int, error) {
+	matches, err := r.episodes(ctx, series, season)
+	if err != nil {
+		return 0, err
+	}
+
+	return len(matches), nil
+}
+
 func (r *seasonResolver) Episodes(ctx context.Context, obj *model.Season) ([]*model.Episode, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	var matches []*model.Episode
-	for _, video := range r.videos {
-		episode := video.Episode
-		if episode == nil {
-			continue
-		}
-
-		if obj != nil {
-			if episode.Season.ID != obj.ID {
-				continue
-			}
-		}
-
-		matches = append(matches, episode)
-
+	matches, err := r.episodes(ctx, obj)
+	if err != nil {
+		return nil, err
 	}
 
 	sort.Sort(model.ByEpisode(matches))
 
 	return matches, nil
+}
+
+func (r *seasonResolver) EpisodeCount(ctx context.Context, obj *model.Season) (int, error) {
+	matches, err := r.episodes(ctx, obj)
+	if err != nil {
+		return 0, err
+	}
+
+	return len(matches), nil
 }
 
 func (r *seriesResolver) Seasons(ctx context.Context, obj *model.Series) ([]*model.Season, error) {
@@ -188,28 +167,23 @@ func (r *seriesResolver) Seasons(ctx context.Context, obj *model.Series) ([]*mod
 }
 
 func (r *seriesResolver) Episodes(ctx context.Context, obj *model.Series) ([]*model.Episode, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	var matches []*model.Episode
-	for _, video := range r.videos {
-		episode := video.Episode
-		if episode == nil {
-			continue
-		}
-
-		if obj != nil {
-			if episode.Season.Series.ID != obj.ID {
-				continue
-			}
-		}
-
-		matches = append(matches, episode)
+	matches, err := r.episodes(ctx, obj)
+	if err != nil {
+		return nil, err
 	}
 
 	sort.Sort(model.ByEpisode(matches))
 
 	return matches, nil
+}
+
+func (r *seriesResolver) EpisodeCount(ctx context.Context, obj *model.Series) (int, error) {
+	matches, err := r.episodes(ctx, obj)
+	if err != nil {
+		return 0, err
+	}
+
+	return len(matches), nil
 }
 
 func (r *videoResolver) Renditions(ctx context.Context, obj *model.Video, quality *model.QualityFilter) ([]*model.Rendition, error) {

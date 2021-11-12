@@ -64,11 +64,12 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Episodes func(childComplexity int, season *model.SeasonFilter) int
-		Seasons  func(childComplexity int, series *model.SeriesFilter) int
-		Series   func(childComplexity int, paginate *model.Paginate) int
-		Video    func(childComplexity int, id string) int
-		Videos   func(childComplexity int, paginate *model.Paginate, title *string, contributor *model.ContributorFilter) int
+		EpisodeCount func(childComplexity int, series *model.SeriesFilter, season *model.SeasonFilter) int
+		Episodes     func(childComplexity int, series *model.SeriesFilter, season *model.SeasonFilter) int
+		Seasons      func(childComplexity int, series *model.SeriesFilter) int
+		Series       func(childComplexity int, paginate *model.Paginate) int
+		Video        func(childComplexity int, id string) int
+		Videos       func(childComplexity int, paginate *model.Paginate, title *string, contributor *model.ContributorFilter) int
 	}
 
 	Rendition struct {
@@ -82,19 +83,21 @@ type ComplexityRoot struct {
 	}
 
 	Season struct {
-		Episodes func(childComplexity int) int
-		ID       func(childComplexity int) int
-		Season   func(childComplexity int) int
-		Series   func(childComplexity int) int
+		EpisodeCount func(childComplexity int) int
+		Episodes     func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Season       func(childComplexity int) int
+		Series       func(childComplexity int) int
 	}
 
 	Series struct {
-		Artwork  func(childComplexity int, geometry *model.GeometryFilter) int
-		Episodes func(childComplexity int) int
-		ID       func(childComplexity int) int
-		Name     func(childComplexity int) int
-		Seasons  func(childComplexity int) int
-		SortName func(childComplexity int) int
+		Artwork      func(childComplexity int, geometry *model.GeometryFilter) int
+		EpisodeCount func(childComplexity int) int
+		Episodes     func(childComplexity int) int
+		ID           func(childComplexity int) int
+		Name         func(childComplexity int) int
+		Seasons      func(childComplexity int) int
+		SortName     func(childComplexity int) int
 	}
 
 	Video struct {
@@ -120,14 +123,17 @@ type QueryResolver interface {
 	Videos(ctx context.Context, paginate *model.Paginate, title *string, contributor *model.ContributorFilter) ([]*model.Video, error)
 	Series(ctx context.Context, paginate *model.Paginate) ([]*model.Series, error)
 	Seasons(ctx context.Context, series *model.SeriesFilter) ([]*model.Season, error)
-	Episodes(ctx context.Context, season *model.SeasonFilter) ([]*model.Episode, error)
+	Episodes(ctx context.Context, series *model.SeriesFilter, season *model.SeasonFilter) ([]*model.Episode, error)
+	EpisodeCount(ctx context.Context, series *model.SeriesFilter, season *model.SeasonFilter) (int, error)
 }
 type SeasonResolver interface {
 	Episodes(ctx context.Context, obj *model.Season) ([]*model.Episode, error)
+	EpisodeCount(ctx context.Context, obj *model.Season) (int, error)
 }
 type SeriesResolver interface {
 	Seasons(ctx context.Context, obj *model.Series) ([]*model.Season, error)
 	Episodes(ctx context.Context, obj *model.Series) ([]*model.Episode, error)
+	EpisodeCount(ctx context.Context, obj *model.Series) (int, error)
 }
 type VideoResolver interface {
 	Renditions(ctx context.Context, obj *model.Video, quality *model.QualityFilter) ([]*model.Rendition, error)
@@ -212,6 +218,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Quality.VideoCodec(childComplexity), true
 
+	case "Query.episodeCount":
+		if e.complexity.Query.EpisodeCount == nil {
+			break
+		}
+
+		args, err := ec.field_Query_episodeCount_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.EpisodeCount(childComplexity, args["series"].(*model.SeriesFilter), args["season"].(*model.SeasonFilter)), true
+
 	case "Query.episodes":
 		if e.complexity.Query.Episodes == nil {
 			break
@@ -222,7 +240,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Episodes(childComplexity, args["season"].(*model.SeasonFilter)), true
+		return e.complexity.Query.Episodes(childComplexity, args["series"].(*model.SeriesFilter), args["season"].(*model.SeasonFilter)), true
 
 	case "Query.seasons":
 		if e.complexity.Query.Seasons == nil {
@@ -321,6 +339,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Rendition.URL(childComplexity), true
 
+	case "Season.episodeCount":
+		if e.complexity.Season.EpisodeCount == nil {
+			break
+		}
+
+		return e.complexity.Season.EpisodeCount(childComplexity), true
+
 	case "Season.episodes":
 		if e.complexity.Season.Episodes == nil {
 			break
@@ -360,6 +385,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Series.Artwork(childComplexity, args["geometry"].(*model.GeometryFilter)), true
+
+	case "Series.episodeCount":
+		if e.complexity.Series.EpisodeCount == nil {
+			break
+		}
+
+		return e.complexity.Series.EpisodeCount(childComplexity), true
 
 	case "Series.episodes":
 		if e.complexity.Series.Episodes == nil {
@@ -581,10 +613,15 @@ type Query {
 
   """
   Get a list of TV episodes.
-  Filter by season details (if specified).
+  Filter by season and series (if specified).
   Ordered by series sortName, season number, then episode number.
   """
-  episodes(season: SeasonFilter): [Episode!]!
+  episodes(series: SeriesFilter, season: SeasonFilter): [Episode!]!
+  """
+  Count of TV episodes.
+  Filter by season and series (if specified).
+  """
+  episodeCount(series: SeriesFilter, season: SeasonFilter): Int!
 }
 
 
@@ -629,7 +666,6 @@ type Video {
 
   """
   Cover art image (optional).
-  Base64 encoded JPEG.
   Downsampled per geometry (if specified).
   Currently obtained from the mp4 moov.udta.meta.ilst.covr.data atom.
   """
@@ -702,7 +738,6 @@ type Series {
   """
   Series image (optional).
   NYI.
-  Base64 encoded JPEG.
   Downsampled per geometry (if specified).
   """
   artwork(geometry: GeometryFilter): Jpeg
@@ -710,8 +745,10 @@ type Series {
   "List of seasons."
   seasons: [Season!]!
 
-  "List of episodes."
+  "List of episodes, regardless of season."
   episodes: [Episode!]!
+  "Count of episodes, regardless of season."
+  episodeCount: Int!
 }
 
 "Series selection."
@@ -728,30 +765,46 @@ type Season {
   Currently a hash of series name and season number for idempotence.
   """
   id: ID!
+  "Series."
   series: Series!
+  """
+  Season number, within a series.
+  Currently obtained from the mp4 moov.udta.meta.ilst.tvsn.data atom.
+  """
   season: Int!
+  "List of episodes in season."
   episodes: [Episode!]!
+  "Count of episodes in season."
+  episodeCount: Int!
 }
 
 "Season selection."
 input SeasonFilter {
   id: ID
-  series: SeriesFilter
   season: Int			# XXX paginator?
 }
 
 
 "Episode (i.e., TV Show) details."
 type Episode {
+  "Season."
   season: Season!
+  """
+  Episode number, within a season.
+  Currently obtained from the mp4 moov.udta.meta.ilst.tves.data atom.
+  """
   episode: Int!
+  """
+  Episode ID, within a series.
+  Currently obtained from the mp4 moov.udta.meta.ilst.tven.data atom.
+  """
   episodeID: String
+  "Video."
   video: Video!
 }
 
 "Episode selection."
 input EpisodeFilter {
-  season: SeasonFilter
   episode: Int			# XXX paginator?
 }
 
@@ -883,18 +936,51 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_episodes_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Query_episodeCount_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *model.SeasonFilter
-	if tmp, ok := rawArgs["season"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("season"))
-		arg0, err = ec.unmarshalOSeasonFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeasonFilter(ctx, tmp)
+	var arg0 *model.SeriesFilter
+	if tmp, ok := rawArgs["series"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("series"))
+		arg0, err = ec.unmarshalOSeriesFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeriesFilter(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["season"] = arg0
+	args["series"] = arg0
+	var arg1 *model.SeasonFilter
+	if tmp, ok := rawArgs["season"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("season"))
+		arg1, err = ec.unmarshalOSeasonFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeasonFilter(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["season"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_episodes_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *model.SeriesFilter
+	if tmp, ok := rawArgs["series"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("series"))
+		arg0, err = ec.unmarshalOSeriesFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeriesFilter(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["series"] = arg0
+	var arg1 *model.SeasonFilter
+	if tmp, ok := rawArgs["season"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("season"))
+		arg1, err = ec.unmarshalOSeasonFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeasonFilter(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["season"] = arg1
 	return args, nil
 }
 
@@ -1561,7 +1647,7 @@ func (ec *executionContext) _Query_episodes(ctx context.Context, field graphql.C
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Episodes(rctx, args["season"].(*model.SeasonFilter))
+		return ec.resolvers.Query().Episodes(rctx, args["series"].(*model.SeriesFilter), args["season"].(*model.SeasonFilter))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1576,6 +1662,48 @@ func (ec *executionContext) _Query_episodes(ctx context.Context, field graphql.C
 	res := resTmp.([]*model.Episode)
 	fc.Result = res
 	return ec.marshalNEpisode2ᚕᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐEpisodeᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_episodeCount(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_episodeCount_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EpisodeCount(rctx, args["series"].(*model.SeriesFilter), args["season"].(*model.SeasonFilter))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -2025,6 +2153,41 @@ func (ec *executionContext) _Season_episodes(ctx context.Context, field graphql.
 	return ec.marshalNEpisode2ᚕᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐEpisodeᚄ(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Season_episodeCount(ctx context.Context, field graphql.CollectedField, obj *model.Season) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Season",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Season().EpisodeCount(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Series_id(ctx context.Context, field graphql.CollectedField, obj *model.Series) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -2237,6 +2400,41 @@ func (ec *executionContext) _Series_episodes(ctx context.Context, field graphql.
 	res := resTmp.([]*model.Episode)
 	fc.Result = res
 	return ec.marshalNEpisode2ᚕᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐEpisodeᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Series_episodeCount(ctx context.Context, field graphql.CollectedField, obj *model.Series) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Series",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Series().EpisodeCount(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Video_id(ctx context.Context, field graphql.CollectedField, obj *model.Video) (ret graphql.Marshaler) {
@@ -3875,14 +4073,6 @@ func (ec *executionContext) unmarshalInputEpisodeFilter(ctx context.Context, obj
 
 	for k, v := range asMap {
 		switch k {
-		case "season":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("season"))
-			it.Season, err = ec.unmarshalOSeasonFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeasonFilter(ctx, v)
-			if err != nil {
-				return it, err
-			}
 		case "episode":
 			var err error
 
@@ -4004,14 +4194,6 @@ func (ec *executionContext) unmarshalInputSeasonFilter(ctx context.Context, obj 
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
 			it.ID, err = ec.unmarshalOID2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "series":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("series"))
-			it.Series, err = ec.unmarshalOSeriesFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐSeriesFilter(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -4258,6 +4440,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}
 				return res
 			})
+		case "episodeCount":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_episodeCount(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "__type":
 			out.Values[i] = ec._Query___type(ctx, field)
 		case "__schema":
@@ -4361,6 +4557,20 @@ func (ec *executionContext) _Season(ctx context.Context, sel ast.SelectionSet, o
 				}
 				return res
 			})
+		case "episodeCount":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Season_episodeCount(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4423,6 +4633,20 @@ func (ec *executionContext) _Series(ctx context.Context, sel ast.SelectionSet, o
 					}
 				}()
 				res = ec._Series_episodes(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "episodeCount":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Series_episodeCount(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}

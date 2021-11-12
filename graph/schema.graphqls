@@ -25,10 +25,15 @@ type Query {
 
   """
   Get a list of TV episodes.
-  Filter by season details (if specified).
+  Filter by season and series (if specified).
   Ordered by series sortName, season number, then episode number.
   """
-  episodes(season: SeasonFilter): [Episode!]!
+  episodes(series: SeriesFilter, season: SeasonFilter): [Episode!]!
+  """
+  Count of TV episodes.
+  Filter by season and series (if specified).
+  """
+  episodeCount(series: SeriesFilter, season: SeasonFilter): Int!
 }
 
 
@@ -73,7 +78,6 @@ type Video {
 
   """
   Cover art image (optional).
-  Base64 encoded JPEG.
   Downsampled per geometry (if specified).
   Currently obtained from the mp4 moov.udta.meta.ilst.covr.data atom.
   """
@@ -146,7 +150,6 @@ type Series {
   """
   Series image (optional).
   NYI.
-  Base64 encoded JPEG.
   Downsampled per geometry (if specified).
   """
   artwork(geometry: GeometryFilter): Jpeg
@@ -154,8 +157,10 @@ type Series {
   "List of seasons."
   seasons: [Season!]!
 
-  "List of episodes."
+  "List of episodes, regardless of season."
   episodes: [Episode!]!
+  "Count of episodes, regardless of season."
+  episodeCount: Int!
 }
 
 "Series selection."
@@ -172,30 +177,46 @@ type Season {
   Currently a hash of series name and season number for idempotence.
   """
   id: ID!
+  "Series."
   series: Series!
+  """
+  Season number, within a series.
+  Currently obtained from the mp4 moov.udta.meta.ilst.tvsn.data atom.
+  """
   season: Int!
+  "List of episodes in season."
   episodes: [Episode!]!
+  "Count of episodes in season."
+  episodeCount: Int!
 }
 
 "Season selection."
 input SeasonFilter {
   id: ID
-  series: SeriesFilter
   season: Int			# XXX paginator?
 }
 
 
 "Episode (i.e., TV Show) details."
 type Episode {
+  "Season."
   season: Season!
+  """
+  Episode number, within a season.
+  Currently obtained from the mp4 moov.udta.meta.ilst.tves.data atom.
+  """
   episode: Int!
+  """
+  Episode ID, within a series.
+  Currently obtained from the mp4 moov.udta.meta.ilst.tven.data atom.
+  """
   episodeID: String
+  "Video."
   video: Video!
 }
 
 "Episode selection."
 input EpisodeFilter {
-  season: SeasonFilter
   episode: Int			# XXX paginator?
 }
 
