@@ -58,7 +58,11 @@ models:
     fields:
       artwork:
         resolver: true
-      renditions:
+  Artwork:
+    fields:
+      base64:
+        resolver: true
+      url:
         resolver: true
   Season:
     fields:
@@ -74,3 +78,12 @@ models:
         resolver: true
       episodeCount:
         resolver: true
+  Renditions:
+    fields:
+      rendition:
+        resolver: true
+  Rendition:
+    fields:
+      url:
+        resolver: true
+

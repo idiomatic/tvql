@@ -29,6 +29,7 @@ type Query {
   Ordered by series sortName, season number, then episode number.
   """
   episodes(series: SeriesFilter, season: SeasonFilter): [Episode!]!
+
   """
   Count of TV episodes.
   Filter by season and series (if specified).
@@ -74,14 +75,13 @@ type Video {
   Filter by rendition quality (if specified).
   Null or empty list implies this video is a placeholder, and renditions are coming soon.
   """
-  renditions(quality: QualityFilter): [Rendition!]
+  renditions: Renditions
 
   """
   Cover art image (optional).
-  Downsampled per geometry (if specified).
   Currently obtained from the mp4 moov.udta.meta.ilst.covr.data atom.
   """
-  artwork(geometry: GeometryFilter): Jpeg
+  artwork: Artwork
 
   """
   Description paragraph (optional).
@@ -150,9 +150,8 @@ type Series {
   """
   Series image (optional).
   NYI.
-  Downsampled per geometry (if specified).
   """
-  artwork(geometry: GeometryFilter): Jpeg
+  artwork: Artwork
 
   "List of seasons."
   seasons: [Season!]!
@@ -177,15 +176,19 @@ type Season {
   Currently a hash of series name and season number for idempotence.
   """
   id: ID!
+
   "Series."
   series: Series!
+
   """
   Season number, within a series.
   Currently obtained from the mp4 moov.udta.meta.ilst.tvsn.data atom.
   """
   season: Int!
+
   "List of episodes in season."
   episodes: [Episode!]!
+
   "Count of episodes in season."
   episodeCount: Int!
 }
@@ -201,23 +204,33 @@ input SeasonFilter {
 type Episode {
   "Season."
   season: Season!
+
   """
   Episode number, within a season.
   Currently obtained from the mp4 moov.udta.meta.ilst.tves.data atom.
   """
   episode: Int!
+
   """
   Episode ID, within a series.
   Currently obtained from the mp4 moov.udta.meta.ilst.tven.data atom.
   """
   episodeID: String
+
   "Video."
   video: Video!
 }
 
+
 "Episode selection."
 input EpisodeFilter {
   episode: Int			# XXX paginator?
+}
+
+
+type Renditions {
+  all: [Rendition!]
+  rendition(quality: QualityFilter): Rendition
 }
 
 
@@ -305,10 +318,21 @@ input GeometryFilter {
 
 
 """
-Jpeg image.
-Encoded in base64.
+Artwork.
 """
-scalar Jpeg
+type Artwork {
+  """
+  URL to image/jpeg.
+  Eventually downsampled per geometry.
+  """
+  url(geometry: GeometryFilter): String!
+
+  """
+  JPEG encoded in base64.
+  Downsampled per geometry.
+  """
+  base64(geometry: GeometryFilter): String!
+}
 
 
 "Select a slice of identifiable objects."

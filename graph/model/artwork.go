@@ -1,29 +1,50 @@
-package graph
+package model
 
 import (
 	"bytes"
-	"context"
-	"encoding/base64"
+	"fmt"
 	"image"
 	"image/jpeg"
+	"os"
 
 	"github.com/disintegration/imaging"
-	"github.com/idiomatic/tvql/graph/model"
+	"github.com/idiomatic/tvql/metadata/mp4"
+	"github.com/sunfish-shogi/bufseekio"
 )
 
-func (r *videoResolver) resizeArtwork(ctx context.Context, video *model.Video, geometry *model.GeometryFilter) (*string, error) {
-	id := video.ID
-	artwork, ok := r.artwork[id]
-	if !ok {
-		return nil, nil
-	}
-
-	artwork, err := resizeArtwork(artwork, geometry)
-	artworkString := base64.StdEncoding.EncodeToString(artwork)
-	return &artworkString, err
+type Artwork struct {
+	ID string
 }
 
-func resizeArtwork(artwork []byte, geometry *model.GeometryFilter) ([]byte, error) {
+// XXX video id or rendition id?
+func (l *Library) GetArtwork(id string) ([]byte, error) {
+	l.Mutex.Lock()
+	defer l.Mutex.Unlock()
+
+	path, ok := l.RenditionPath[id]
+	if !ok {
+		return nil, fmt.Errorf("video not found")
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	bufferedFile := bufseekio.NewReadSeeker(file, 1024, 4)
+
+	videoFile := mp4.NewFile(bufferedFile)
+
+	artwork, err := videoFile.CoverArt()
+	if err != nil {
+		return nil, err
+	}
+
+	return artwork, nil
+}
+
+func ResizeArtwork(artwork []byte, geometry *GeometryFilter) ([]byte, error) {
 	if geometry == nil {
 		return artwork, nil
 	}

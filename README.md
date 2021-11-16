@@ -6,9 +6,9 @@ See [schema](graph/schema.graphqls).
 
 ### query filters
 
-    query ById($id: ID!) { video(id: $id) { ... } }
+    query ById($id: ID!) { video(id: $id) { title } }
 
-    query ByTitle($title: String!) { videos(title: $title) { ... } }
+    query ByTitle($title: String!) { videos(title: $title) { releaseYear } }
 
 ### query pagination cursors
 
@@ -46,6 +46,23 @@ transcode profiles are combined.
         }
       }
     }
+    
+    query TargetedRenditions {
+      videos {
+        title
+        rendition {
+          hd: rendition(quality: {resolution: "1080p"}) {
+            url
+          }
+          dvd: rendition(quality: {resolution: "720p"}) {
+            url
+          }
+          sd: rendition(quality: {resolution: "480p"}) {
+            url
+          }
+        }
+      }
+    }
 
 ### iTunes metadata extraction
 
@@ -55,7 +72,9 @@ transcode profiles are combined.
         releaseYear
         description
         genre
-        artwork
+        artwork {
+          url(geometry: {height: 640})
+        }
         episode {
           season {
             series {
@@ -127,7 +146,9 @@ Compatible with pagination.
 
     query ArtworkResizing {
       videos {
-        artwork(geometry: { height: 72 })
+        artwork {
+          base64(geometry: { height: 72 })
+        }
       }
     }
 

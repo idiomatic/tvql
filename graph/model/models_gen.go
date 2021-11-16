@@ -90,6 +90,11 @@ type Rendition struct {
 	Size int `json:"size"`
 }
 
+type Renditions struct {
+	All       []*Rendition `json:"all"`
+	Rendition *Rendition   `json:"rendition"`
+}
+
 // Season details.
 type Season struct {
 	// Season identity.
@@ -126,8 +131,7 @@ type Series struct {
 	SortName string `json:"sortName"`
 	// Series image (optional).
 	// NYI.
-	// Downsampled per geometry (if specified).
-	Artwork *string `json:"artwork"`
+	Artwork *Artwork `json:"artwork"`
 	// List of seasons.
 	Seasons []*Season `json:"seasons"`
 	// List of episodes, regardless of season.
@@ -165,11 +169,10 @@ type Video struct {
 	// List of various renditions of this video.
 	// Filter by rendition quality (if specified).
 	// Null or empty list implies this video is a placeholder, and renditions are coming soon.
-	Renditions []*Rendition `json:"renditions"`
+	Renditions *Renditions `json:"renditions"`
 	// Cover art image (optional).
-	// Downsampled per geometry (if specified).
 	// Currently obtained from the mp4 moov.udta.meta.ilst.covr.data atom.
-	Artwork *string `json:"artwork"`
+	Artwork *Artwork `json:"artwork"`
 	// Description paragraph (optional).
 	// Currently obtained from the mp4 moov.udta.meta.ilst.desc.data atom.
 	Description *string `json:"description"`

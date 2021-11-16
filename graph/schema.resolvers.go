@@ -5,18 +5,55 @@ package graph
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"net/url"
 	"sort"
+	"strconv"
 
 	"github.com/idiomatic/tvql/graph/generated"
 	"github.com/idiomatic/tvql/graph/model"
 )
 
-func (r *queryResolver) Video(ctx context.Context, id string) (*model.Video, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+func (r *artworkResolver) URL(ctx context.Context, obj *model.Artwork, geometry *model.GeometryFilter) (string, error) {
+	values := make(url.Values)
+	if geometry != nil {
+		if geometry.Width != nil {
+			values.Set("width", strconv.Itoa(*geometry.Width))
+		}
+		if geometry.Height != nil {
+			values.Set("height", strconv.Itoa(*geometry.Height))
+		}
+	}
 
-	video, ok := r.videos[id]
+	relativeURL := &url.URL{
+		Path:     obj.ID,
+		RawQuery: values.Encode(),
+	}
+	resolvedURL := r.artworkBase.ResolveReference(relativeURL)
+
+	return resolvedURL.String(), nil
+}
+
+func (r *artworkResolver) Base64(ctx context.Context, obj *model.Artwork, geometry *model.GeometryFilter) (string, error) {
+	artwork, err := r.library.GetArtwork(obj.ID)
+	if err != nil {
+		return "", err
+	}
+
+	artwork, err = model.ResizeArtwork(artwork, geometry)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(artwork), nil
+}
+
+func (r *queryResolver) Video(ctx context.Context, id string) (*model.Video, error) {
+	r.library.Mutex.Lock()
+	defer r.library.Mutex.Unlock()
+
+	video, ok := r.library.Videos[id]
 	if !ok {
 		return nil, fmt.Errorf("video not found")
 	}
@@ -25,15 +62,15 @@ func (r *queryResolver) Video(ctx context.Context, id string) (*model.Video, err
 }
 
 func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, title *string, contributor *model.ContributorFilter) ([]*model.Video, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.library.Mutex.Lock()
+	defer r.library.Mutex.Unlock()
 
 	if contributor != nil {
 		panic(fmt.Errorf("not implemented"))
 	}
 
 	var matches []*model.Video
-	for _, video := range r.videos {
+	for _, video := range r.library.Videos {
 		if title != nil && video.Title != *title {
 			continue
 		}
@@ -60,11 +97,11 @@ func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, ti
 }
 
 func (r *queryResolver) Series(ctx context.Context, paginate *model.Paginate) ([]*model.Series, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.library.Mutex.Lock()
+	defer r.library.Mutex.Unlock()
 
 	var matches []*model.Series
-	for _, series := range r.series {
+	for _, series := range r.library.Series {
 		matches = append(matches, series)
 	}
 
@@ -87,11 +124,11 @@ func (r *queryResolver) Series(ctx context.Context, paginate *model.Paginate) ([
 }
 
 func (r *queryResolver) Seasons(ctx context.Context, series *model.SeriesFilter) ([]*model.Season, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.library.Mutex.Lock()
+	defer r.library.Mutex.Unlock()
 
 	var matches []*model.Season
-	for _, season := range r.seasons {
+	for _, season := range r.library.Seasons {
 		if series != nil {
 			if season.Series.ID != *series.ID {
 				continue
@@ -126,6 +163,37 @@ func (r *queryResolver) EpisodeCount(ctx context.Context, series *model.SeriesFi
 	return len(matches), nil
 }
 
+func (r *renditionResolver) URL(ctx context.Context, obj *model.Rendition) (string, error) {
+	_, ok := r.library.RenditionPath[obj.ID]
+	if !ok {
+		return "", fmt.Errorf("rendition not found")
+	}
+
+	relativeURL := &url.URL{Path: obj.ID}
+	resolvedURL := r.videoBase.ResolveReference(relativeURL)
+
+	return resolvedURL.String(), nil
+}
+
+func (r *renditionsResolver) Rendition(ctx context.Context, obj *model.Renditions, quality *model.QualityFilter) (*model.Rendition, error) {
+	r.library.Mutex.Lock()
+	defer r.library.Mutex.Unlock()
+
+	for _, rendition := range obj.All {
+		if quality != nil && rendition.Quality != nil {
+			// XXX func (vc *VideoCodec) Matches(quality *QualityFilter) bool
+			if quality.VideoCodec != nil && *quality.VideoCodec != rendition.Quality.VideoCodec {
+				continue
+			}
+			if quality.Resolution != nil && *quality.Resolution != rendition.Quality.Resolution {
+				continue
+			}
+		}
+		return rendition, nil
+	}
+	return nil, nil
+}
+
 func (r *seasonResolver) Episodes(ctx context.Context, obj *model.Season) ([]*model.Episode, error) {
 	matches, err := r.episodes(ctx, obj)
 	if err != nil {
@@ -147,11 +215,11 @@ func (r *seasonResolver) EpisodeCount(ctx context.Context, obj *model.Season) (i
 }
 
 func (r *seriesResolver) Seasons(ctx context.Context, obj *model.Series) ([]*model.Season, error) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.library.Mutex.Lock()
+	defer r.library.Mutex.Unlock()
 
 	var matches []*model.Season
-	for _, season := range r.seasons {
+	for _, season := range r.library.Seasons {
 		if obj != nil {
 			if season.Series.ID != obj.ID {
 				continue
@@ -186,17 +254,24 @@ func (r *seriesResolver) EpisodeCount(ctx context.Context, obj *model.Series) (i
 	return len(matches), nil
 }
 
-func (r *videoResolver) Renditions(ctx context.Context, obj *model.Video, quality *model.QualityFilter) ([]*model.Rendition, error) {
-	// XXX filter on quality
-	return obj.Renditions, nil
+func (r *videoResolver) Artwork(ctx context.Context, obj *model.Video) (*model.Artwork, error) {
+	if _, err := r.library.GetArtwork(obj.ID); err != nil {
+		return nil, nil
+	}
+	return &model.Artwork{ID: obj.ID}, nil
 }
 
-func (r *videoResolver) Artwork(ctx context.Context, obj *model.Video, geometry *model.GeometryFilter) (*string, error) {
-	return r.resizeArtwork(ctx, obj, geometry)
-}
+// Artwork returns generated.ArtworkResolver implementation.
+func (r *Resolver) Artwork() generated.ArtworkResolver { return &artworkResolver{r} }
 
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
+
+// Rendition returns generated.RenditionResolver implementation.
+func (r *Resolver) Rendition() generated.RenditionResolver { return &renditionResolver{r} }
+
+// Renditions returns generated.RenditionsResolver implementation.
+func (r *Resolver) Renditions() generated.RenditionsResolver { return &renditionsResolver{r} }
 
 // Season returns generated.SeasonResolver implementation.
 func (r *Resolver) Season() generated.SeasonResolver { return &seasonResolver{r} }
@@ -207,7 +282,10 @@ func (r *Resolver) Series() generated.SeriesResolver { return &seriesResolver{r}
 // Video returns generated.VideoResolver implementation.
 func (r *Resolver) Video() generated.VideoResolver { return &videoResolver{r} }
 
+type artworkResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type renditionResolver struct{ *Resolver }
+type renditionsResolver struct{ *Resolver }
 type seasonResolver struct{ *Resolver }
 type seriesResolver struct{ *Resolver }
 type videoResolver struct{ *Resolver }

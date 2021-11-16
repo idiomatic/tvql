@@ -35,7 +35,10 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Artwork() ArtworkResolver
 	Query() QueryResolver
+	Rendition() RenditionResolver
+	Renditions() RenditionsResolver
 	Season() SeasonResolver
 	Series() SeriesResolver
 	Video() VideoResolver
@@ -45,6 +48,11 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	Artwork struct {
+		Base64 func(childComplexity int, geometry *model.GeometryFilter) int
+		URL    func(childComplexity int, geometry *model.GeometryFilter) int
+	}
+
 	Contributor struct {
 		ID   func(childComplexity int) int
 		Name func(childComplexity int) int
@@ -82,6 +90,11 @@ type ComplexityRoot struct {
 		URL      func(childComplexity int) int
 	}
 
+	Renditions struct {
+		All       func(childComplexity int) int
+		Rendition func(childComplexity int, quality *model.QualityFilter) int
+	}
+
 	Season struct {
 		EpisodeCount func(childComplexity int) int
 		Episodes     func(childComplexity int) int
@@ -91,7 +104,7 @@ type ComplexityRoot struct {
 	}
 
 	Series struct {
-		Artwork      func(childComplexity int, geometry *model.GeometryFilter) int
+		Artwork      func(childComplexity int) int
 		EpisodeCount func(childComplexity int) int
 		Episodes     func(childComplexity int) int
 		ID           func(childComplexity int) int
@@ -101,7 +114,7 @@ type ComplexityRoot struct {
 	}
 
 	Video struct {
-		Artwork       func(childComplexity int, geometry *model.GeometryFilter) int
+		Artwork       func(childComplexity int) int
 		Cast          func(childComplexity int) int
 		ContentRating func(childComplexity int) int
 		Description   func(childComplexity int) int
@@ -110,7 +123,7 @@ type ComplexityRoot struct {
 		Genre         func(childComplexity int) int
 		ID            func(childComplexity int) int
 		ReleaseYear   func(childComplexity int) int
-		Renditions    func(childComplexity int, quality *model.QualityFilter) int
+		Renditions    func(childComplexity int) int
 		SortTitle     func(childComplexity int) int
 		Title         func(childComplexity int) int
 		Tomatometer   func(childComplexity int) int
@@ -118,6 +131,10 @@ type ComplexityRoot struct {
 	}
 }
 
+type ArtworkResolver interface {
+	URL(ctx context.Context, obj *model.Artwork, geometry *model.GeometryFilter) (string, error)
+	Base64(ctx context.Context, obj *model.Artwork, geometry *model.GeometryFilter) (string, error)
+}
 type QueryResolver interface {
 	Video(ctx context.Context, id string) (*model.Video, error)
 	Videos(ctx context.Context, paginate *model.Paginate, title *string, contributor *model.ContributorFilter) ([]*model.Video, error)
@@ -125,6 +142,12 @@ type QueryResolver interface {
 	Seasons(ctx context.Context, series *model.SeriesFilter) ([]*model.Season, error)
 	Episodes(ctx context.Context, series *model.SeriesFilter, season *model.SeasonFilter) ([]*model.Episode, error)
 	EpisodeCount(ctx context.Context, series *model.SeriesFilter, season *model.SeasonFilter) (int, error)
+}
+type RenditionResolver interface {
+	URL(ctx context.Context, obj *model.Rendition) (string, error)
+}
+type RenditionsResolver interface {
+	Rendition(ctx context.Context, obj *model.Renditions, quality *model.QualityFilter) (*model.Rendition, error)
 }
 type SeasonResolver interface {
 	Episodes(ctx context.Context, obj *model.Season) ([]*model.Episode, error)
@@ -136,8 +159,7 @@ type SeriesResolver interface {
 	EpisodeCount(ctx context.Context, obj *model.Series) (int, error)
 }
 type VideoResolver interface {
-	Renditions(ctx context.Context, obj *model.Video, quality *model.QualityFilter) ([]*model.Rendition, error)
-	Artwork(ctx context.Context, obj *model.Video, geometry *model.GeometryFilter) (*string, error)
+	Artwork(ctx context.Context, obj *model.Video) (*model.Artwork, error)
 }
 
 type executableSchema struct {
@@ -154,6 +176,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "Artwork.base64":
+		if e.complexity.Artwork.Base64 == nil {
+			break
+		}
+
+		args, err := ec.field_Artwork_base64_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Artwork.Base64(childComplexity, args["geometry"].(*model.GeometryFilter)), true
+
+	case "Artwork.url":
+		if e.complexity.Artwork.URL == nil {
+			break
+		}
+
+		args, err := ec.field_Artwork_url_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Artwork.URL(childComplexity, args["geometry"].(*model.GeometryFilter)), true
 
 	case "Contributor.id":
 		if e.complexity.Contributor.ID == nil {
@@ -339,6 +385,25 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Rendition.URL(childComplexity), true
 
+	case "Renditions.all":
+		if e.complexity.Renditions.All == nil {
+			break
+		}
+
+		return e.complexity.Renditions.All(childComplexity), true
+
+	case "Renditions.rendition":
+		if e.complexity.Renditions.Rendition == nil {
+			break
+		}
+
+		args, err := ec.field_Renditions_rendition_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Renditions.Rendition(childComplexity, args["quality"].(*model.QualityFilter)), true
+
 	case "Season.episodeCount":
 		if e.complexity.Season.EpisodeCount == nil {
 			break
@@ -379,12 +444,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Series_artwork_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Series.Artwork(childComplexity, args["geometry"].(*model.GeometryFilter)), true
+		return e.complexity.Series.Artwork(childComplexity), true
 
 	case "Series.episodeCount":
 		if e.complexity.Series.EpisodeCount == nil {
@@ -433,12 +493,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Video_artwork_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Video.Artwork(childComplexity, args["geometry"].(*model.GeometryFilter)), true
+		return e.complexity.Video.Artwork(childComplexity), true
 
 	case "Video.cast":
 		if e.complexity.Video.Cast == nil {
@@ -501,12 +556,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Video_renditions_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Video.Renditions(childComplexity, args["quality"].(*model.QualityFilter)), true
+		return e.complexity.Video.Renditions(childComplexity), true
 
 	case "Video.sortTitle":
 		if e.complexity.Video.SortTitle == nil {
@@ -617,6 +667,7 @@ type Query {
   Ordered by series sortName, season number, then episode number.
   """
   episodes(series: SeriesFilter, season: SeasonFilter): [Episode!]!
+
   """
   Count of TV episodes.
   Filter by season and series (if specified).
@@ -662,14 +713,13 @@ type Video {
   Filter by rendition quality (if specified).
   Null or empty list implies this video is a placeholder, and renditions are coming soon.
   """
-  renditions(quality: QualityFilter): [Rendition!]
+  renditions: Renditions
 
   """
   Cover art image (optional).
-  Downsampled per geometry (if specified).
   Currently obtained from the mp4 moov.udta.meta.ilst.covr.data atom.
   """
-  artwork(geometry: GeometryFilter): Jpeg
+  artwork: Artwork
 
   """
   Description paragraph (optional).
@@ -738,9 +788,8 @@ type Series {
   """
   Series image (optional).
   NYI.
-  Downsampled per geometry (if specified).
   """
-  artwork(geometry: GeometryFilter): Jpeg
+  artwork: Artwork
 
   "List of seasons."
   seasons: [Season!]!
@@ -765,15 +814,19 @@ type Season {
   Currently a hash of series name and season number for idempotence.
   """
   id: ID!
+
   "Series."
   series: Series!
+
   """
   Season number, within a series.
   Currently obtained from the mp4 moov.udta.meta.ilst.tvsn.data atom.
   """
   season: Int!
+
   "List of episodes in season."
   episodes: [Episode!]!
+
   "Count of episodes in season."
   episodeCount: Int!
 }
@@ -789,23 +842,33 @@ input SeasonFilter {
 type Episode {
   "Season."
   season: Season!
+
   """
   Episode number, within a season.
   Currently obtained from the mp4 moov.udta.meta.ilst.tves.data atom.
   """
   episode: Int!
+
   """
   Episode ID, within a series.
   Currently obtained from the mp4 moov.udta.meta.ilst.tven.data atom.
   """
   episodeID: String
+
   "Video."
   video: Video!
 }
 
+
 "Episode selection."
 input EpisodeFilter {
   episode: Int			# XXX paginator?
+}
+
+
+type Renditions {
+  all: [Rendition!]
+  rendition(quality: QualityFilter): Rendition
 }
 
 
@@ -893,10 +956,21 @@ input GeometryFilter {
 
 
 """
-Jpeg image.
-Encoded in base64.
+Artwork.
 """
-scalar Jpeg
+type Artwork {
+  """
+  URL to image/jpeg.
+  Eventually downsampled per geometry.
+  """
+  url(geometry: GeometryFilter): String!
+
+  """
+  JPEG encoded in base64.
+  Downsampled per geometry.
+  """
+  base64(geometry: GeometryFilter): String!
+}
 
 
 "Select a slice of identifiable objects."
@@ -920,6 +994,36 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Artwork_base64_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *model.GeometryFilter
+	if tmp, ok := rawArgs["geometry"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("geometry"))
+		arg0, err = ec.unmarshalOGeometryFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐGeometryFilter(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["geometry"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Artwork_url_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *model.GeometryFilter
+	if tmp, ok := rawArgs["geometry"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("geometry"))
+		arg0, err = ec.unmarshalOGeometryFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐGeometryFilter(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["geometry"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -1062,37 +1166,7 @@ func (ec *executionContext) field_Query_videos_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
-func (ec *executionContext) field_Series_artwork_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 *model.GeometryFilter
-	if tmp, ok := rawArgs["geometry"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("geometry"))
-		arg0, err = ec.unmarshalOGeometryFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐGeometryFilter(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["geometry"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Video_artwork_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 *model.GeometryFilter
-	if tmp, ok := rawArgs["geometry"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("geometry"))
-		arg0, err = ec.unmarshalOGeometryFilter2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐGeometryFilter(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["geometry"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Video_renditions_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Renditions_rendition_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 *model.QualityFilter
@@ -1144,6 +1218,90 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _Artwork_url(ctx context.Context, field graphql.CollectedField, obj *model.Artwork) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Artwork",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Artwork_url_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Artwork().URL(rctx, obj, args["geometry"].(*model.GeometryFilter))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Artwork_base64(ctx context.Context, field graphql.CollectedField, obj *model.Artwork) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Artwork",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Artwork_base64_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Artwork().Base64(rctx, obj, args["geometry"].(*model.GeometryFilter))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
 
 func (ec *executionContext) _Contributor_id(ctx context.Context, field graphql.CollectedField, obj *model.Contributor) (ret graphql.Marshaler) {
 	defer func() {
@@ -1823,14 +1981,14 @@ func (ec *executionContext) _Rendition_url(ctx context.Context, field graphql.Co
 		Object:     "Rendition",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.URL, nil
+		return ec.resolvers.Rendition().URL(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2011,6 +2169,77 @@ func (ec *executionContext) _Rendition_size(ctx context.Context, field graphql.C
 	res := resTmp.(int)
 	fc.Result = res
 	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Renditions_all(ctx context.Context, field graphql.CollectedField, obj *model.Renditions) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Renditions",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.All, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Rendition)
+	fc.Result = res
+	return ec.marshalORendition2ᚕᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐRenditionᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Renditions_rendition(ctx context.Context, field graphql.CollectedField, obj *model.Renditions) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Renditions",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Renditions_rendition_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Renditions().Rendition(rctx, obj, args["quality"].(*model.QualityFilter))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Rendition)
+	fc.Result = res
+	return ec.marshalORendition2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐRendition(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Season_id(ctx context.Context, field graphql.CollectedField, obj *model.Season) (ret graphql.Marshaler) {
@@ -2309,13 +2538,6 @@ func (ec *executionContext) _Series_artwork(ctx context.Context, field graphql.C
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Series_artwork_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.Artwork, nil
@@ -2327,9 +2549,9 @@ func (ec *executionContext) _Series_artwork(ctx context.Context, field graphql.C
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(*model.Artwork)
 	fc.Result = res
-	return ec.marshalOJpeg2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalOArtwork2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐArtwork(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Series_seasons(ctx context.Context, field graphql.CollectedField, obj *model.Series) (ret graphql.Marshaler) {
@@ -2588,21 +2810,14 @@ func (ec *executionContext) _Video_renditions(ctx context.Context, field graphql
 		Object:     "Video",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Video_renditions_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Video().Renditions(rctx, obj, args["quality"].(*model.QualityFilter))
+		return obj.Renditions, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2611,9 +2826,9 @@ func (ec *executionContext) _Video_renditions(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Rendition)
+	res := resTmp.(*model.Renditions)
 	fc.Result = res
-	return ec.marshalORendition2ᚕᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐRenditionᚄ(ctx, field.Selections, res)
+	return ec.marshalORenditions2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐRenditions(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Video_artwork(ctx context.Context, field graphql.CollectedField, obj *model.Video) (ret graphql.Marshaler) {
@@ -2632,16 +2847,9 @@ func (ec *executionContext) _Video_artwork(ctx context.Context, field graphql.Co
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Video_artwork_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Video().Artwork(rctx, obj, args["geometry"].(*model.GeometryFilter))
+		return ec.resolvers.Video().Artwork(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2650,9 +2858,9 @@ func (ec *executionContext) _Video_artwork(ctx context.Context, field graphql.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(*model.Artwork)
 	fc.Result = res
-	return ec.marshalOJpeg2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalOArtwork2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐArtwork(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Video_description(ctx context.Context, field graphql.CollectedField, obj *model.Video) (ret graphql.Marshaler) {
@@ -4250,6 +4458,56 @@ func (ec *executionContext) unmarshalInputSeriesFilter(ctx context.Context, obj 
 
 // region    **************************** object.gotpl ****************************
 
+var artworkImplementors = []string{"Artwork"}
+
+func (ec *executionContext) _Artwork(ctx context.Context, sel ast.SelectionSet, obj *model.Artwork) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, artworkImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Artwork")
+		case "url":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Artwork_url(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "base64":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Artwork_base64(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var contributorImplementors = []string{"Contributor"}
 
 func (ec *executionContext) _Contributor(ctx context.Context, sel ast.SelectionSet, obj *model.Contributor) graphql.Marshaler {
@@ -4483,19 +4741,28 @@ func (ec *executionContext) _Rendition(ctx context.Context, sel ast.SelectionSet
 		case "id":
 			out.Values[i] = ec._Rendition_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "url":
-			out.Values[i] = ec._Rendition_url(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Rendition_url(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "cut":
 			out.Values[i] = ec._Rendition_cut(ctx, field, obj)
 		case "quality":
 			out.Values[i] = ec._Rendition_quality(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "duration":
 			out.Values[i] = ec._Rendition_duration(ctx, field, obj)
@@ -4504,8 +4771,43 @@ func (ec *executionContext) _Rendition(ctx context.Context, sel ast.SelectionSet
 		case "size":
 			out.Values[i] = ec._Rendition_size(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var renditionsImplementors = []string{"Renditions"}
+
+func (ec *executionContext) _Renditions(ctx context.Context, sel ast.SelectionSet, obj *model.Renditions) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, renditionsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Renditions")
+		case "all":
+			out.Values[i] = ec._Renditions_all(ctx, field, obj)
+		case "rendition":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Renditions_rendition(ctx, field, obj)
+				return res
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4695,16 +4997,7 @@ func (ec *executionContext) _Video(ctx context.Context, sel ast.SelectionSet, ob
 				atomic.AddUint32(&invalids, 1)
 			}
 		case "renditions":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Video_renditions(ctx, field, obj)
-				return res
-			})
+			out.Values[i] = ec._Video_renditions(ctx, field, obj)
 		case "artwork":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -5585,6 +5878,13 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) marshalOArtwork2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐArtwork(ctx context.Context, sel ast.SelectionSet, v *model.Artwork) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Artwork(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5709,21 +6009,6 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	return graphql.MarshalInt(*v)
 }
 
-func (ec *executionContext) unmarshalOJpeg2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := graphql.UnmarshalString(v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOJpeg2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return graphql.MarshalString(*v)
-}
-
 func (ec *executionContext) unmarshalOPaginate2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐPaginate(ctx context.Context, v interface{}) (*model.Paginate, error) {
 	if v == nil {
 		return nil, nil
@@ -5785,6 +6070,20 @@ func (ec *executionContext) marshalORendition2ᚕᚖgithubᚗcomᚋidiomaticᚋt
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalORendition2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐRendition(ctx context.Context, sel ast.SelectionSet, v *model.Rendition) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Rendition(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORenditions2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐRenditions(ctx context.Context, sel ast.SelectionSet, v *model.Renditions) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Renditions(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOResolution2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
