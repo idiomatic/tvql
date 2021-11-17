@@ -27,7 +27,7 @@ func (r *artworkResolver) URL(ctx context.Context, obj *model.Artwork, geometry 
 	}
 
 	relativeURL := &url.URL{
-		Path:     obj.ID,
+		Path:     obj.ID.String(),
 		RawQuery: values.Encode(),
 	}
 	resolvedURL := r.artworkBase.ResolveReference(relativeURL)
@@ -36,7 +36,7 @@ func (r *artworkResolver) URL(ctx context.Context, obj *model.Artwork, geometry 
 }
 
 func (r *artworkResolver) Base64(ctx context.Context, obj *model.Artwork, geometry *model.GeometryFilter) (string, error) {
-	artwork, err := r.library.GetArtwork(obj.ID)
+	artwork, err := r.library.GetArtwork(obj.ID.String())
 	if err != nil {
 		return "", err
 	}
@@ -53,7 +53,7 @@ func (r *queryResolver) Video(ctx context.Context, id string) (*model.Video, err
 	r.library.Mutex.Lock()
 	defer r.library.Mutex.Unlock()
 
-	metavideo, ok := r.library.Metavideos[id]
+	metavideo, ok := r.library.Metavideos[model.Stringer{id}]
 	if !ok {
 		return nil, fmt.Errorf("video not found")
 	}
@@ -110,7 +110,7 @@ func (r *queryResolver) Series(ctx context.Context, paginate *model.Paginate) ([
 
 	if paginate != nil && paginate.After != nil {
 		for i, series := range matches {
-			if series.ID == *paginate.After {
+			if series.Name == *paginate.After {
 				matches = matches[i+1:]
 				break
 			}
@@ -131,7 +131,7 @@ func (r *queryResolver) Seasons(ctx context.Context, series *model.SeriesFilter)
 	var matches []*model.Season
 	for _, season := range r.library.Seasons {
 		if series != nil {
-			if season.Series.ID != *series.ID {
+			if season.Series.Name != *series.Name {
 				continue
 			}
 		}
@@ -145,7 +145,7 @@ func (r *queryResolver) Seasons(ctx context.Context, series *model.SeriesFilter)
 }
 
 func (r *queryResolver) Episodes(ctx context.Context, series *model.SeriesFilter, season *model.SeasonFilter) ([]*model.Episode, error) {
-	matches, err := r.episodes(ctx, series, season)
+	matches, err := r.library.Episodes(series, season)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (r *queryResolver) Episodes(ctx context.Context, series *model.SeriesFilter
 }
 
 func (r *queryResolver) EpisodeCount(ctx context.Context, series *model.SeriesFilter, season *model.SeasonFilter) (int, error) {
-	matches, err := r.episodes(ctx, series, season)
+	matches, err := r.library.Episodes(series, season)
 	if err != nil {
 		return 0, err
 	}
@@ -196,7 +196,10 @@ func (r *renditionsResolver) Rendition(ctx context.Context, obj *model.Rendition
 }
 
 func (r *seasonResolver) Episodes(ctx context.Context, obj *model.Season) ([]*model.Episode, error) {
-	matches, err := r.episodes(ctx, obj)
+	series := &model.SeriesFilter{Name: &obj.Series.Name}
+	season := &model.SeasonFilter{Season: &obj.Season}
+
+	matches, err := r.library.Episodes(series, season)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +210,10 @@ func (r *seasonResolver) Episodes(ctx context.Context, obj *model.Season) ([]*mo
 }
 
 func (r *seasonResolver) EpisodeCount(ctx context.Context, obj *model.Season) (int, error) {
-	matches, err := r.episodes(ctx, obj)
+	series := &model.SeriesFilter{Name: &obj.Series.Name}
+	season := &model.SeasonFilter{Season: &obj.Season}
+
+	matches, err := r.library.Episodes(series, season)
 	if err != nil {
 		return 0, err
 	}
@@ -221,10 +227,8 @@ func (r *seriesResolver) Seasons(ctx context.Context, obj *model.Series) ([]*mod
 
 	var matches []*model.Season
 	for _, season := range r.library.Seasons {
-		if obj != nil {
-			if season.Series.ID != obj.ID {
-				continue
-			}
+		if season.Series != obj {
+			continue
 		}
 
 		matches = append(matches, season)
@@ -236,7 +240,8 @@ func (r *seriesResolver) Seasons(ctx context.Context, obj *model.Series) ([]*mod
 }
 
 func (r *seriesResolver) Episodes(ctx context.Context, obj *model.Series) ([]*model.Episode, error) {
-	matches, err := r.episodes(ctx, obj)
+	series := &model.SeriesFilter{Name: &obj.Name}
+	matches, err := r.library.Episodes(series, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +252,8 @@ func (r *seriesResolver) Episodes(ctx context.Context, obj *model.Series) ([]*mo
 }
 
 func (r *seriesResolver) EpisodeCount(ctx context.Context, obj *model.Series) (int, error) {
-	matches, err := r.episodes(ctx, obj)
+	series := &model.SeriesFilter{Name: &obj.Name}
+	matches, err := r.library.Episodes(series, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -259,7 +265,7 @@ func (r *videoResolver) Artwork(ctx context.Context, obj *model.Video) (*model.A
 	if _, err := r.library.GetArtwork(obj.ID); err != nil {
 		return nil, nil
 	}
-	return &model.Artwork{ID: obj.ID}, nil
+	return &model.Artwork{ID: model.Stringer{obj.ID}}, nil
 }
 
 // Artwork returns generated.ArtworkResolver implementation.

@@ -117,22 +117,17 @@ type Video {
 
 "NYI"
 type Contributor {
-  id: ID!
   name: String!
 }
 
 "NYI"
 input ContributorFilter {
-  id: ID
   name: String
 }
 
 
 "Series details."
 type Series {
-  "Series identity."
-  id: ID!
-
   """
   Series name.
   May include reboot qualifiers (e.g., "The Twilight Zone (2019)").
@@ -165,19 +160,12 @@ type Series {
 
 "Series selection."
 input SeriesFilter {
-  id: ID
   name: String
 }
 
 
 "Season details."
 type Season {
-  """
-  Season identity.
-  Currently a hash of series name and season number for idempotence.
-  """
-  id: ID!
-
   "Series."
   series: Series!
 
@@ -196,7 +184,6 @@ type Season {
 
 "Season selection."
 input SeasonFilter {
-  id: ID
   season: Int			# XXX paginator?
 }
 

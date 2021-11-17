@@ -13,7 +13,7 @@ import (
 )
 
 type Artwork struct {
-	ID string
+	ID MetavideoID
 }
 
 // XXX video id or rendition id?
@@ -21,7 +21,7 @@ func (l *Library) GetArtwork(id string) ([]byte, error) {
 	l.Mutex.Lock()
 	defer l.Mutex.Unlock()
 
-	metavideo, ok := l.Metavideos[id]
+	metavideo, ok := l.Metavideos[Stringer{id}]
 	if !ok {
 		return nil, fmt.Errorf("video not found")
 	}

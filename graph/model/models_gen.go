@@ -10,13 +10,11 @@ import (
 
 // NYI
 type Contributor struct {
-	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
 // NYI
 type ContributorFilter struct {
-	ID   *string `json:"id"`
 	Name *string `json:"name"`
 }
 
@@ -97,9 +95,6 @@ type Renditions struct {
 
 // Season details.
 type Season struct {
-	// Season identity.
-	// Currently a hash of series name and season number for idempotence.
-	ID string `json:"id"`
 	// Series.
 	Series *Series `json:"series"`
 	// Season number, within a series.
@@ -113,14 +108,11 @@ type Season struct {
 
 // Season selection.
 type SeasonFilter struct {
-	ID     *string `json:"id"`
-	Season *int    `json:"season"`
+	Season *int `json:"season"`
 }
 
 // Series details.
 type Series struct {
-	// Series identity.
-	ID string `json:"id"`
 	// Series name.
 	// May include reboot qualifiers (e.g., "The Twilight Zone (2019)").
 	// Currently obtained from the mp4 moov.udta.meta.ilst.tvsh.data atom.
@@ -142,7 +134,6 @@ type Series struct {
 
 // Series selection.
 type SeriesFilter struct {
-	ID   *string `json:"id"`
 	Name *string `json:"name"`
 }
 

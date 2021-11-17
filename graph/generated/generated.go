@@ -54,7 +54,6 @@ type ComplexityRoot struct {
 	}
 
 	Contributor struct {
-		ID   func(childComplexity int) int
 		Name func(childComplexity int) int
 	}
 
@@ -98,7 +97,6 @@ type ComplexityRoot struct {
 	Season struct {
 		EpisodeCount func(childComplexity int) int
 		Episodes     func(childComplexity int) int
-		ID           func(childComplexity int) int
 		Season       func(childComplexity int) int
 		Series       func(childComplexity int) int
 	}
@@ -107,7 +105,6 @@ type ComplexityRoot struct {
 		Artwork      func(childComplexity int) int
 		EpisodeCount func(childComplexity int) int
 		Episodes     func(childComplexity int) int
-		ID           func(childComplexity int) int
 		Name         func(childComplexity int) int
 		Seasons      func(childComplexity int) int
 		SortName     func(childComplexity int) int
@@ -200,13 +197,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Artwork.URL(childComplexity, args["geometry"].(*model.GeometryFilter)), true
-
-	case "Contributor.id":
-		if e.complexity.Contributor.ID == nil {
-			break
-		}
-
-		return e.complexity.Contributor.ID(childComplexity), true
 
 	case "Contributor.name":
 		if e.complexity.Contributor.Name == nil {
@@ -418,13 +408,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Season.Episodes(childComplexity), true
 
-	case "Season.id":
-		if e.complexity.Season.ID == nil {
-			break
-		}
-
-		return e.complexity.Season.ID(childComplexity), true
-
 	case "Season.season":
 		if e.complexity.Season.Season == nil {
 			break
@@ -459,13 +442,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Series.Episodes(childComplexity), true
-
-	case "Series.id":
-		if e.complexity.Series.ID == nil {
-			break
-		}
-
-		return e.complexity.Series.ID(childComplexity), true
 
 	case "Series.name":
 		if e.complexity.Series.Name == nil {
@@ -755,22 +731,17 @@ type Video {
 
 "NYI"
 type Contributor {
-  id: ID!
   name: String!
 }
 
 "NYI"
 input ContributorFilter {
-  id: ID
   name: String
 }
 
 
 "Series details."
 type Series {
-  "Series identity."
-  id: ID!
-
   """
   Series name.
   May include reboot qualifiers (e.g., "The Twilight Zone (2019)").
@@ -803,19 +774,12 @@ type Series {
 
 "Series selection."
 input SeriesFilter {
-  id: ID
   name: String
 }
 
 
 "Season details."
 type Season {
-  """
-  Season identity.
-  Currently a hash of series name and season number for idempotence.
-  """
-  id: ID!
-
   "Series."
   series: Series!
 
@@ -834,7 +798,6 @@ type Season {
 
 "Season selection."
 input SeasonFilter {
-  id: ID
   season: Int			# XXX paginator?
 }
 
@@ -1302,41 +1265,6 @@ func (ec *executionContext) _Artwork_base64(ctx context.Context, field graphql.C
 	res := resTmp.(string)
 	fc.Result = res
 	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Contributor_id(ctx context.Context, field graphql.CollectedField, obj *model.Contributor) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Contributor",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Contributor_name(ctx context.Context, field graphql.CollectedField, obj *model.Contributor) (ret graphql.Marshaler) {
@@ -2243,41 +2171,6 @@ func (ec *executionContext) _Renditions_rendition(ctx context.Context, field gra
 	return ec.marshalORendition2ᚖgithubᚗcomᚋidiomaticᚋtvqlᚋgraphᚋmodelᚐRendition(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Season_id(ctx context.Context, field graphql.CollectedField, obj *model.Season) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Season",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _Season_series(ctx context.Context, field graphql.CollectedField, obj *model.Season) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -2416,41 +2309,6 @@ func (ec *executionContext) _Season_episodeCount(ctx context.Context, field grap
 	res := resTmp.(int)
 	fc.Result = res
 	return ec.marshalNInt2int(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Series_id(ctx context.Context, field graphql.CollectedField, obj *model.Series) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Series",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Series_name(ctx context.Context, field graphql.CollectedField, obj *model.Series) (ret graphql.Marshaler) {
@@ -4251,14 +4109,6 @@ func (ec *executionContext) unmarshalInputContributorFilter(ctx context.Context,
 
 	for k, v := range asMap {
 		switch k {
-		case "id":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			it.ID, err = ec.unmarshalOID2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
 		case "name":
 			var err error
 
@@ -4398,14 +4248,6 @@ func (ec *executionContext) unmarshalInputSeasonFilter(ctx context.Context, obj 
 
 	for k, v := range asMap {
 		switch k {
-		case "id":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			it.ID, err = ec.unmarshalOID2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
 		case "season":
 			var err error
 
@@ -4429,14 +4271,6 @@ func (ec *executionContext) unmarshalInputSeriesFilter(ctx context.Context, obj 
 
 	for k, v := range asMap {
 		switch k {
-		case "id":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-			it.ID, err = ec.unmarshalOID2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
 		case "name":
 			var err error
 
@@ -4520,11 +4354,6 @@ func (ec *executionContext) _Contributor(ctx context.Context, sel ast.SelectionS
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Contributor")
-		case "id":
-			out.Values[i] = ec._Contributor_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		case "name":
 			out.Values[i] = ec._Contributor_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -4831,11 +4660,6 @@ func (ec *executionContext) _Season(ctx context.Context, sel ast.SelectionSet, o
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Season")
-		case "id":
-			out.Values[i] = ec._Season_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "series":
 			out.Values[i] = ec._Season_series(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -4896,11 +4720,6 @@ func (ec *executionContext) _Series(ctx context.Context, sel ast.SelectionSet, o
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Series")
-		case "id":
-			out.Values[i] = ec._Series_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "name":
 			out.Values[i] = ec._Series_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {

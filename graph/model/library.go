@@ -23,19 +23,64 @@ type Metarendition struct {
 	Path string
 }
 
+// useful for toll-free use of encoded VideoID/EpisodeID via client
+type Stringer struct {
+	S string
+}
+
+func (s Stringer) String() string {
+	return s.S
+}
+
+type MetavideoID interface {
+	fmt.Stringer
+}
+
+type VideoID struct {
+	Title       string
+	ReleaseYear int
+}
+
+// note: exposed to client
+func (id VideoID) String() string {
+	key := fmt.Sprintf("%s (%d)", id.Title, id.ReleaseYear)
+	return key
+	return hashToStr(key)
+}
+
+type SeriesID string
+
+type SeasonID struct {
+	SeriesID     SeriesID
+	SeasonNumber int
+}
+
+type EpisodeID struct {
+	SeasonID
+	EpisodeNumber int
+	VideoID
+}
+
+// note: exposed to client
+func (id EpisodeID) String() string {
+	key := fmt.Sprintf("%s %d%02d %s", id.SeriesID, id.SeasonNumber, id.EpisodeNumber, id.VideoID)
+	return key
+	return hashToStr(key)
+}
+
 type Library struct {
-	Metavideos     map[string]*Metavideo
-	Series         map[string]*Series
-	Seasons        map[string]*Season
+	Metavideos     map[MetavideoID]*Metavideo
+	Series         map[SeriesID]*Series
+	Seasons        map[SeasonID]*Season
 	Metarenditions map[string]*Metarendition
 	Mutex          sync.Mutex
 }
 
 func NewLibrary() *Library {
 	return &Library{
-		Metavideos:     make(map[string]*Metavideo),
-		Series:         make(map[string]*Series),
-		Seasons:        make(map[string]*Season),
+		Metavideos:     make(map[MetavideoID]*Metavideo),
+		Series:         make(map[SeriesID]*Series),
+		Seasons:        make(map[SeasonID]*Season),
 		Metarenditions: make(map[string]*Metarendition),
 	}
 }
@@ -76,19 +121,35 @@ func (l *Library) Survey(root string) error {
 				}
 				releaseYear, _ := strconv.Atoi(releaseDate[:4])
 
-				id := idFromTitleAndYear(title, releaseYear)
+				seriesName, seriesNameErr := videoFile.TVShowName()
+				seasonNumber, seasonNumberErr := videoFile.TVSeason()
+				episodeNumber, episodeNumberErr := videoFile.TVEpisode()
+
+				var (
+					videoID   = VideoID{title, releaseYear}
+					seriesID  = SeriesID(seriesName)
+					seasonID  = SeasonID{seriesID, seasonNumber}
+					episodeID = EpisodeID{seasonID, episodeNumber, videoID}
+
+					metavideoID MetavideoID = videoID
+				)
+
+				if seriesNameErr == nil && seasonNumberErr == nil && episodeNumberErr == nil && seriesName != "" && seasonNumber > 0 {
+					metavideoID = episodeID
+				}
+
 				l.Mutex.Lock()
-				metavideo, ok := l.Metavideos[id]
+				metavideo, ok := l.Metavideos[videoID]
 				if !ok {
 					metavideo = &Metavideo{
 						Video{
-							ID:          id,
+							ID:          metavideoID.String(),
 							Title:       title,
 							ReleaseYear: releaseYear,
 						},
 						path,
 					}
-					l.Metavideos[id] = metavideo
+					l.Metavideos[metavideoID] = metavideo
 				}
 				l.Mutex.Unlock()
 
@@ -109,23 +170,11 @@ func (l *Library) Survey(root string) error {
 				}
 
 				// XXX switch off mediakind?
-				if seriesName, err := videoFile.TVShowName(); err == nil && seriesName != "" {
-					seasonNumber, err := videoFile.TVSeason()
-					if err != nil {
-						// HACK missing or zero season looks funny
-						seasonNumber = 1
-					}
-
-					episodeNumber, _ := videoFile.TVEpisode()
-
-					seasonID := idFromSeriesAndSeason(seriesName, seasonNumber)
-					seriesID := hashToStr(seriesName)
-
+				if seriesNameErr == nil && seriesName != "" {
 					l.Mutex.Lock()
 					series, ok := l.Series[seriesID]
 					if !ok {
 						series = &Series{
-							ID:   seriesID,
 							Name: seriesName,
 						}
 						l.Series[seriesID] = series
@@ -134,7 +183,6 @@ func (l *Library) Survey(root string) error {
 					season, ok := l.Seasons[seasonID]
 					if !ok {
 						season = &Season{
-							ID:     seasonID,
 							Season: seasonNumber,
 							Series: series,
 						}
@@ -146,7 +194,7 @@ func (l *Library) Survey(root string) error {
 						episode = &Episode{
 							Season:  season,
 							Episode: episodeNumber,
-							Video:   video, // XXX circular reference loop
+							Video:   video, // XXX cyclic reference loop
 						}
 						video.Episode = episode
 					}
@@ -189,16 +237,6 @@ func (l *Library) Survey(root string) error {
 func hashToStr(payload string) string {
 	msg := sha256.Sum256([]byte(payload))
 	return base64.StdEncoding.EncodeToString(msg[:])
-}
-
-func idFromTitleAndYear(title string, releaseYear int) string {
-	key := fmt.Sprintf("%s (%d)", title, releaseYear)
-	return hashToStr(key)
-}
-
-func idFromSeriesAndSeason(series string, season int) string {
-	key := fmt.Sprintf("%s (%d)", series, season)
-	return hashToStr(key)
 }
 
 func qualityFromPath(path string) *Quality {
@@ -247,4 +285,33 @@ func qualityFromPath(path string) *Quality {
 	}
 
 	return q
+}
+
+func (l *Library) Episodes(series *SeriesFilter, season *SeasonFilter) ([]*Episode, error) {
+	l.Mutex.Lock()
+	defer l.Mutex.Unlock()
+
+	var matches []*Episode
+	for _, metavideo := range l.Metavideos {
+		episode := metavideo.Video.Episode
+		if episode == nil {
+			continue
+		}
+
+		if season != nil && season.Season != nil {
+			if episode.Season.Season != *season.Season {
+				continue
+			}
+		}
+
+		if series != nil && series.Name != nil {
+			if episode.Season.Series.Name != *series.Name {
+				continue
+			}
+		}
+
+		matches = append(matches, episode)
+	}
+
+	return matches, nil
 }
