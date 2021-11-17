@@ -31,8 +31,8 @@ func (r *seriesResolver) episodes(ctx context.Context, obj *model.Series) ([]*mo
 	defer r.library.Mutex.Unlock()
 
 	var matches []*model.Episode
-	for _, video := range r.library.Videos {
-		episode := video.Episode
+	for _, metavideo := range r.library.Metavideos {
+		episode := metavideo.Video.Episode
 		if episode == nil {
 			continue
 		}
@@ -54,8 +54,8 @@ func (r *queryResolver) episodes(ctx context.Context, series *model.SeriesFilter
 	defer r.library.Mutex.Unlock()
 
 	var matches []*model.Episode
-	for _, video := range r.library.Videos {
-		episode := video.Episode
+	for _, metavideo := range r.library.Metavideos {
+		episode := metavideo.Video.Episode
 		if episode == nil {
 			continue
 		}
@@ -87,8 +87,8 @@ func (r *seasonResolver) episodes(ctx context.Context, obj *model.Season) ([]*mo
 	defer r.library.Mutex.Unlock()
 
 	var matches []*model.Episode
-	for _, video := range r.library.Videos {
-		episode := video.Episode
+	for _, metavideo := range r.library.Metavideos {
+		episode := metavideo.Video.Episode
 		if episode == nil {
 			continue
 		}

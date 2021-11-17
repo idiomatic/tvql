@@ -53,12 +53,12 @@ func (r *queryResolver) Video(ctx context.Context, id string) (*model.Video, err
 	r.library.Mutex.Lock()
 	defer r.library.Mutex.Unlock()
 
-	video, ok := r.library.Videos[id]
+	metavideo, ok := r.library.Metavideos[id]
 	if !ok {
 		return nil, fmt.Errorf("video not found")
 	}
 
-	return video, nil
+	return &metavideo.Video, nil
 }
 
 func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, title *string, contributor *model.ContributorFilter) ([]*model.Video, error) {
@@ -70,12 +70,12 @@ func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, ti
 	}
 
 	var matches []*model.Video
-	for _, video := range r.library.Videos {
-		if title != nil && video.Title != *title {
+	for _, metavideo := range r.library.Metavideos {
+		if title != nil && metavideo.Video.Title != *title {
 			continue
 		}
 
-		matches = append(matches, video)
+		matches = append(matches, &metavideo.Video)
 	}
 
 	sort.Sort(model.ByVideoTitle(matches))
@@ -87,6 +87,7 @@ func (r *queryResolver) Videos(ctx context.Context, paginate *model.Paginate, ti
 				break
 			}
 		}
+		// XXX should a not-found After result in []?
 	}
 
 	if paginate != nil && paginate.First != nil && len(matches) > *paginate.First {
@@ -164,7 +165,7 @@ func (r *queryResolver) EpisodeCount(ctx context.Context, series *model.SeriesFi
 }
 
 func (r *renditionResolver) URL(ctx context.Context, obj *model.Rendition) (string, error) {
-	_, ok := r.library.RenditionPath[obj.ID]
+	_, ok := r.library.Metarenditions[obj.ID]
 	if !ok {
 		return "", fmt.Errorf("rendition not found")
 	}

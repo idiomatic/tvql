@@ -796,6 +796,7 @@ type Series {
 
   "List of episodes, regardless of season."
   episodes: [Episode!]!
+
   "Count of episodes, regardless of season."
   episodeCount: Int!
 }

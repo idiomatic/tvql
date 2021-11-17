@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	defaultBase = "http://localhost/"
 	defaultPort = "8080"
 	defaultRoot = "/Users/brian/Review/Video"
 )
@@ -32,24 +33,35 @@ func main() {
 		root = defaultRoot
 	}
 
-	base, err := url.Parse(fmt.Sprintf("http://localhost:%s/", port))
+	base, err := url.Parse(defaultBase)
 	if err != nil {
 		log.Panic(err)
 	}
-	videoPath := &url.URL{Path: "/video/"}
-	videoBase := base.ResolveReference(videoPath)
-	artworkPath := &url.URL{Path: "/artwork/"}
-	artworkBase := base.ResolveReference(artworkPath)
+	if idx := strings.Index(base.Host, ":"); idx != -1 {
+		base.Host = base.Host[:idx]
+	}
+	base.Host = fmt.Sprintf("%s:%s", base.Host, port)
+	videoBase := base.ResolveReference(&url.URL{Path: "/video/"})
+	artworkBase := base.ResolveReference(&url.URL{Path: "/artwork/"})
 
 	library := model.NewLibrary()
+	go func() {
+		err := library.Survey(root)
+		if err != nil {
+			log.Panic(err)
+		}
+	}()
 
 	http.Handle(videoBase.Path,
 		http.StripPrefix(videoBase.Path,
 			InternalRedirect(func(u *url.URL) {
+				// map base64(video.id) to relative path
 				library.Mutex.Lock()
 				defer library.Mutex.Unlock()
-				absPath := library.RenditionPath[u.Path]
-				u.Path = strings.TrimPrefix(absPath, root)
+				metarendition, ok := library.Metarenditions[u.Path]
+				if ok {
+					u.Path = strings.TrimPrefix(metarendition.Path, root)
+				}
 			}, http.FileServer(http.Dir(root)))))
 
 	resolver := graph.NewResolver(library, videoBase, artworkBase)
@@ -79,22 +91,16 @@ func main() {
 				w.Write(artwork)
 			})))
 
-	go func() {
-		err := library.Survey(root)
-		if err != nil {
-			log.Panic(err)
-		}
-	}()
-
 	srv := handler.NewDefaultServer(
 		generated.NewExecutableSchema(generated.Config{Resolvers: resolver}))
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/query", srv)
 
-	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
+	log.Printf("connect to %s for GraphQL playground", base.String())
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
+// Atoiptr returns a pointer to an int parsed from a string, else nil.
 func Atoiptr(s string) *int {
 	value, err := strconv.Atoi(s)
 	if err != nil {
@@ -103,6 +109,8 @@ func Atoiptr(s string) *int {
 	return &value
 }
 
+// InternalRedirect is like StripPrefix except it allows full
+// manipulation of the request URL.
 func InternalRedirect(fn func(u *url.URL), h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r2 := new(http.Request)

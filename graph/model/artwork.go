@@ -21,10 +21,12 @@ func (l *Library) GetArtwork(id string) ([]byte, error) {
 	l.Mutex.Lock()
 	defer l.Mutex.Unlock()
 
-	path, ok := l.RenditionPath[id]
+	metavideo, ok := l.Metavideos[id]
 	if !ok {
 		return nil, fmt.Errorf("video not found")
 	}
+
+	path := metavideo.Path
 
 	file, err := os.Open(path)
 	if err != nil {

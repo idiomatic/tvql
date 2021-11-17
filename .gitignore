@@ -1,4 +1,5 @@
 *~
+,*
 go.sum
 graph/generated
 graph/model/models_gen.go

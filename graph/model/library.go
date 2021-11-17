@@ -14,20 +14,29 @@ import (
 	"github.com/sunfish-shogi/bufseekio"
 )
 
+type Metavideo struct {
+	Video
+	Path string
+}
+
+type Metarendition struct {
+	Path string
+}
+
 type Library struct {
-	Videos        map[string]*Video
-	Series        map[string]*Series
-	Seasons       map[string]*Season
-	RenditionPath map[string]string
-	Mutex         sync.Mutex
+	Metavideos     map[string]*Metavideo
+	Series         map[string]*Series
+	Seasons        map[string]*Season
+	Metarenditions map[string]*Metarendition
+	Mutex          sync.Mutex
 }
 
 func NewLibrary() *Library {
 	return &Library{
-		Videos:        make(map[string]*Video),
-		Series:        make(map[string]*Series),
-		Seasons:       make(map[string]*Season),
-		RenditionPath: make(map[string]string),
+		Metavideos:     make(map[string]*Metavideo),
+		Series:         make(map[string]*Series),
+		Seasons:        make(map[string]*Season),
+		Metarenditions: make(map[string]*Metarendition),
 	}
 }
 
@@ -69,16 +78,21 @@ func (l *Library) Survey(root string) error {
 
 				id := idFromTitleAndYear(title, releaseYear)
 				l.Mutex.Lock()
-				video, ok := l.Videos[id]
+				metavideo, ok := l.Metavideos[id]
 				if !ok {
-					video = &Video{
-						ID:          id,
-						Title:       title,
-						ReleaseYear: releaseYear,
+					metavideo = &Metavideo{
+						Video{
+							ID:          id,
+							Title:       title,
+							ReleaseYear: releaseYear,
+						},
+						path,
 					}
-					l.Videos[id] = video
+					l.Metavideos[id] = metavideo
 				}
 				l.Mutex.Unlock()
+
+				video := &metavideo.Video
 
 				if sortTitle, err := videoFile.SortTitle(); err != nil || sortTitle == "" {
 					video.SortTitle = SortableTitle(title)
@@ -155,9 +169,9 @@ func (l *Library) Survey(root string) error {
 				{
 					l.Mutex.Lock()
 
-					l.RenditionPath[renditionID] = path
-					// XXX HACK
-					l.RenditionPath[id] = path
+					l.Metarenditions[renditionID] = &Metarendition{
+						path,
+					}
 
 					if video.Renditions == nil {
 						video.Renditions = &Renditions{}
